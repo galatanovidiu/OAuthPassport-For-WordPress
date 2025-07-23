@@ -1,0 +1,200 @@
+.oauth-passport-admin {
+    margin: 20px 0;
+}
+
+.oauth-passport-admin h1 {
+    margin: 0;
+    color: #1e1e1e;
+}
+
+/* Tabs */
+.oauth-passport-tabs {
+    border-bottom: 1px solid #ddd;
+}
+
+.oauth-passport-tabs .components-tab-panel__tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0;
+}
+
+.oauth-passport-tabs .components-button {
+    border-radius: 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    margin-bottom: -1px;
+    background: #f9f9f9;
+    position: relative;
+}
+
+.oauth-passport-tabs .components-button.is-active {
+    background: #fff;
+    border-color: #ddd;
+    border-bottom-color: #fff;
+    z-index: 1;
+}
+
+.oauth-passport-tabs .components-tab-panel__tab-content {
+    padding: 24px 0;
+}
+
+/* Settings Tab */
+.oauth-settings .components-panel__body-title {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.oauth-settings .components-panel__row {
+    margin-bottom: 20px;
+}
+
+.oauth-settings .components-base-control {
+    width: 100%;
+}
+
+.oauth-settings .components-range-control {
+    max-width: 400px;
+}
+
+/* Clients Tab */
+.oauth-clients .clients-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.oauth-clients .client-card {
+    transition: box-shadow 0.2s ease;
+}
+
+.oauth-clients .client-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.oauth-clients .client-card .components-card__header {
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.oauth-clients .client-card .components-card__body {
+    padding-top: 16px;
+    padding-bottom: 16px;
+}
+
+.oauth-clients .client-card .components-card__footer {
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f0;
+}
+
+/* Generate Client Modal */
+.generate-client-form .components-base-control {
+    margin-bottom: 20px;
+}
+
+.generate-client-form .scopes-section {
+    margin-bottom: 20px;
+}
+
+.generate-client-form .scopes-section .components-checkbox-control {
+    margin-bottom: 8px;
+}
+
+.generated-credentials .components-base-control {
+    margin-bottom: 16px;
+}
+
+.generated-credentials .components-text-control__input {
+    font-family: monospace;
+    background: #f8f9fa;
+}
+
+/* Tokens Tab */
+.oauth-tokens .tokens-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.oauth-tokens .token-card {
+    transition: box-shadow 0.2s ease;
+}
+
+.oauth-tokens .token-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.oauth-tokens .token-card.expired {
+    border-left: 4px solid #d63638;
+    background: #fdf2f2;
+}
+
+.oauth-tokens .token-card.expiring-soon {
+    border-left: 4px solid #dba617;
+    background: #fffbf0;
+}
+
+.oauth-tokens .token-card .components-card__header {
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.oauth-tokens .token-card .components-card__body {
+    padding-top: 16px;
+    padding-bottom: 16px;
+}
+
+.oauth-tokens .token-card .components-card__footer {
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f0;
+}
+
+/* Common styles */
+.components-card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e0e0e0;
+}
+
+.components-flex .components-flex-item code {
+    word-break: break-all;
+    font-size: 12px;
+}
+
+/* Loading states */
+.oauth-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: #666;
+}
+
+/* Responsive adjustments */
+@media (max-width: 782px) {
+    .oauth-clients .clients-grid,
+    .oauth-tokens .tokens-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .oauth-passport-admin .components-card {
+        margin: 0 -20px;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+}
+
+/* WordPress admin fixes */
+.oauth-passport-admin .components-modal__frame {
+    max-width: 600px;
+}
+
+.oauth-passport-admin .components-notice {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.oauth-passport-admin .components-button.is-busy::before {
+    color: currentColor;
+} 
