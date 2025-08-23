@@ -12,6 +12,7 @@ namespace OAuthPassport\Tests\Unit;
 
 use OAuthPassport\Auth\OAuth2Server;
 use WP_UnitTestCase;
+use Yoast\PHPUnitPolyfills\TestCases\TestCase;
 
 /**
  * Test OAuth2Server class

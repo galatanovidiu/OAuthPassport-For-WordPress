@@ -10,6 +10,9 @@ declare(strict_types=1);
 // Load Composer autoloader
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
+// Load Yoast PHPUnit polyfills for cross-version compatibility
+require_once dirname(__DIR__) . '/vendor/yoast/phpunit-polyfills/phpunitpolyfills-autoload.php';
+
 // Load WordPress test environment
 if (!defined('WP_TESTS_DIR')) {
     define('WP_TESTS_DIR', getenv('WP_TESTS_DIR') ?: '/tmp/wordpress-tests-lib');
