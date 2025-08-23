@@ -1,8 +1,9 @@
 <?php
 /**
- * OAuth Scope Manager for OAuth Passport
+ * OAuth Scope Manager
  *
- * Manages OAuth scopes and permissions.
+ * Manages OAuth scope validation, permissions, and scope-based access control
+ * for authorization requests and token generation.
  *
  * @package OAuthPassport
  * @subpackage Auth
@@ -12,16 +13,22 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Auth;
 
+use OAuthPassport\Contracts\ScopeValidatorInterface;
+
 /**
  * Class ScopeManager
  *
- * Manages OAuth scopes for OAuth Passport.
+ * Handles OAuth scope validation, permission checking, and scope-based
+ * access control for OAuth authorization and token flows.
  */
-class ScopeManager {
+class ScopeManager implements ScopeValidatorInterface {
 	/**
-	 * Available OAuth scopes
+	 * Available OAuth scopes with descriptions
 	 *
-	 * @var array
+	 * Defines the default scopes available for OAuth clients.
+	 * Can be extended via the 'oauth_passport_scopes' filter.
+	 *
+	 * @var array<string, string>
 	 */
 	public const AVAILABLE_SCOPES = array(
 		'read'  => 'Read your content and data',
@@ -30,16 +37,22 @@ class ScopeManager {
 	);
 
 	/**
-	 * Default scopes for new clients
+	 * Default scopes granted to new clients
 	 *
-	 * @var array
+	 * These scopes are automatically granted when no specific
+	 * scopes are requested during authorization.
+	 *
+	 * @var array<string>
 	 */
 	public const DEFAULT_SCOPES = array( 'read' );
 
 	/**
-	 * Get all available scopes (static method for global access)
+	 * Get all available scopes
 	 *
-	 * @return array Array of scope => description.
+	 * Returns all registered OAuth scopes with their descriptions.
+	 * Applies the 'oauth_passport_scopes' filter for customization.
+	 *
+	 * @return array<string, string> Array of scope => description pairs
 	 */
 	public static function get_scopes(): array {
 		return apply_filters( 'oauth_passport_scopes', self::AVAILABLE_SCOPES );
@@ -64,12 +77,22 @@ class ScopeManager {
 	}
 
 	/**
+	 * Get all available scopes (interface method)
+	 *
+	 * @return array Array of scope => description.
+	 */
+	public function getAvailableScopes(): array {
+		return $this->get_available_scopes();
+	}
+
+	/**
 	 * Validate requested scopes
 	 *
-	 * @param string|array $requested_scopes Space-separated string or array of scopes.
+	 * @param array|string $requested_scopes Space-separated string or array of scopes.
+	 *
 	 * @return array Valid scopes.
 	 */
-	public function validate_scopes( $requested_scopes ): array {
+	public function validate_scopes( array|string $requested_scopes ): array {
 		// Convert to array if string.
 		if ( is_string( $requested_scopes ) ) {
 			$requested_scopes = explode( ' ', $requested_scopes );
@@ -90,6 +113,17 @@ class ScopeManager {
 	}
 
 	/**
+	 * Validate requested scopes (interface method)
+	 *
+	 * @param array|string $requested_scopes Space-separated string or array of scopes.
+	 *
+	 * @return array Valid scopes.
+	 */
+	public function validateScopes( array|string $requested_scopes ): array {
+		return $this->validate_scopes( $requested_scopes );
+	}
+
+	/**
 	 * Check if a token has a specific scope
 	 *
 	 * @param string $token_scope Space-separated list of token scopes.
@@ -102,6 +136,17 @@ class ScopeManager {
 	}
 
 	/**
+	 * Check if a token has a specific scope (interface method)
+	 *
+	 * @param string $token_scope Space-separated list of token scopes.
+	 * @param string $required_scope Required scope.
+	 * @return bool True if token has the required scope.
+	 */
+	public function hasScope( string $token_scope, string $required_scope ): bool {
+		return $this->has_scope( $token_scope, $required_scope );
+	}
+
+	/**
 	 * Check if a token has all required scopes
 	 *
 	 * @param string $token_scope Space-separated list of token scopes.
@@ -111,6 +156,17 @@ class ScopeManager {
 	public function has_all_scopes( string $token_scope, array $required_scopes ): bool {
 		$token_scopes = explode( ' ', $token_scope );
 		return count( array_intersect( $required_scopes, $token_scopes ) ) === count( $required_scopes );
+	}
+
+	/**
+	 * Check if a token has all required scopes (interface method)
+	 *
+	 * @param string $token_scope Space-separated list of token scopes.
+	 * @param array  $required_scopes Array of required scopes.
+	 * @return bool True if token has all required scopes.
+	 */
+	public function hasAllScopes( string $token_scope, array $required_scopes ): bool {
+		return $this->has_all_scopes( $token_scope, $required_scopes );
 	}
 
 	/**
@@ -128,10 +184,11 @@ class ScopeManager {
 	/**
 	 * Format scopes for display
 	 *
-	 * @param string|array $scopes Space-separated string or array of scopes.
+	 * @param array|string $scopes Space-separated string or array of scopes.
+	 *
 	 * @return string Human-readable scope descriptions.
 	 */
-	public function format_scopes_for_display( $scopes ): string {
+	public function format_scopes_for_display( array|string $scopes ): string {
 		if ( is_string( $scopes ) ) {
 			$scopes = explode( ' ', $scopes );
 		}
@@ -163,9 +220,9 @@ class ScopeManager {
 	 *
 	 * @param string $required_scope Required scope for the endpoint.
 	 * @param string $token_scope Token's granted scopes.
-	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
+	 * @return bool|\WP_Error True, if valid, WP_Error otherwise.
 	 */
-	public function validate_request_scope( string $required_scope, string $token_scope ) {
+	public function validate_request_scope( string $required_scope, string $token_scope ) :bool|\WP_Error {
 		if ( ! $this->has_scope( $token_scope, $required_scope ) ) {
 			return new \WP_Error(
 				'insufficient_scope',
@@ -230,6 +287,17 @@ class ScopeManager {
 	}
 
 	/**
+	 * Check if user has capabilities for scope (interface method)
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $scope OAuth scope.
+	 * @return bool True if user has all required capabilities.
+	 */
+	public function userCanAccessScope( int $user_id, string $scope ): bool {
+		return $this->user_can_access_scope( $user_id, $scope );
+	}
+
+	/**
 	 * Filter scopes based on user capabilities
 	 *
 	 * @param array $scopes Requested scopes.
@@ -251,5 +319,16 @@ class ScopeManager {
 		}
 
 		return $filtered;
+	}
+
+	/**
+	 * Filter scopes based on user capabilities (interface method)
+	 *
+	 * @param array $scopes Requested scopes.
+	 * @param int   $user_id User ID.
+	 * @return array Scopes the user can actually access.
+	 */
+	public function filterScopesByUserCapabilities( array $scopes, int $user_id ): array {
+		return $this->filter_scopes_by_user_capabilities( $scopes, $user_id );
 	}
 }

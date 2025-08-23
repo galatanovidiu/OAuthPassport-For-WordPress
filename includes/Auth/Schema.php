@@ -66,7 +66,7 @@ class Schema {
 		
 		// Set initial schema version
 		if ( ! get_option( 'oauth_passport_schema_version' ) ) {
-			update_option( 'oauth_passport_schema_version', '1.1.0' );
+			update_option( 'oauth_passport_schema_version', '2.0.0' );
 		}
 	}
 
@@ -95,9 +95,11 @@ class Schema {
 			scope VARCHAR(255),
 			expires_at TIMESTAMP NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			token_version VARCHAR(10) DEFAULT '1.0',
 			INDEX idx_token (token_value),
 			INDEX idx_expires (expires_at),
-			INDEX idx_client_user (client_id, user_id)
+			INDEX idx_client_user (client_id, user_id),
+			INDEX idx_version (token_version)
 		) $charset_collate";
 
 		dbDelta( $sql );
@@ -135,8 +137,10 @@ class Schema {
 			client_secret_expires_at BIGINT,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			secret_version VARCHAR(10) DEFAULT '1.0',
 			INDEX idx_client_id (client_id),
-			INDEX idx_registration_token (registration_access_token)
+			INDEX idx_registration_token (registration_access_token),
+			INDEX idx_secret_version (secret_version)
 		) $charset_collate";
 
 		dbDelta( $sql );
@@ -256,8 +260,85 @@ class Schema {
 			);
 		}
 
+		// Check if we need to upgrade to version 2.0.0 (security improvements)
+		if ( version_compare( $schema_version, '2.0.0', '<' ) ) {
+			$this->upgrade_to_v2();
+		}
+
 		// Update schema version to indicate upgrade is complete
-		update_option( 'oauth_passport_schema_version', '1.1.0' );
+		update_option( 'oauth_passport_schema_version', '2.0.0' );
+	}
+
+	/**
+	 * Upgrade to version 2.0.0 (security improvements)
+	 */
+	private function upgrade_to_v2(): void {
+		global $wpdb;
+
+		// Add version columns if they don't exist
+		if ( ! $this->column_exists( $this->tokens_table, 'token_version' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query(
+				$wpdb->prepare(
+					'ALTER TABLE %i ADD COLUMN token_version VARCHAR(10) DEFAULT %s',
+					$this->tokens_table,
+					'1.0'
+				)
+			);
+
+			// Add index for token_version
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query(
+				$wpdb->prepare(
+					'ALTER TABLE %i ADD INDEX idx_version (token_version)',
+					$this->tokens_table
+				)
+			);
+		}
+
+		if ( ! $this->column_exists( $this->clients_table, 'secret_version' ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query(
+				$wpdb->prepare(
+					'ALTER TABLE %i ADD COLUMN secret_version VARCHAR(10) DEFAULT %s',
+					$this->clients_table,
+					'1.0'
+				)
+			);
+
+			// Add index for secret_version
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query(
+				$wpdb->prepare(
+					'ALTER TABLE %i ADD INDEX idx_secret_version (secret_version)',
+					$this->clients_table
+				)
+			);
+		}
+
+		// Mark existing tokens as legacy (version 1.0) for gradual migration
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i SET token_version = %s WHERE token_version = %s AND token_value NOT LIKE %s',
+				$this->tokens_table,
+				'0.9',
+				'1.0',
+				'oauth_access_%'
+			)
+		);
+
+		// Mark existing client secrets as legacy for rehashing on next authentication
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$wpdb->query(
+			$wpdb->prepare(
+				'UPDATE %i SET secret_version = %s WHERE secret_version = %s AND client_secret NOT LIKE %s',
+				$this->clients_table,
+				'0.9',
+				'1.0',
+				'$argon2%'
+			)
+		);
 	}
 
 	/**

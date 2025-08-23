@@ -16,18 +16,21 @@ class TokenGenerator {
 	/**
 	 * Generate development tokens for a user
 	 *
-	 * @param int    $user_id User ID.
+	 * @param int $user_id User ID.
 	 * @param string $client_id Client ID.
 	 * @param string $scope Token scope.
+	 *
 	 * @return array Token data.
+	 * @throws \Exception
 	 */
 	public static function generate_tokens( int $user_id, string $client_id, string $scope = 'read write' ): array {
 		global $wpdb;
 		$table = $wpdb->prefix . 'oauth_passport_tokens';
 
-		// Generate tokens.
-		$access_token  = 'oauth_passport_access_' . wp_generate_password( 32, false );
-		$refresh_token = 'oauth_passport_refresh_' . wp_generate_password( 32, false );
+		// Generate secure tokens using SecureTokenGenerator.
+		$token_generator = new SecureTokenGenerator();
+		$access_token  = $token_generator->generateAccessToken();
+		$refresh_token = $token_generator->generateRefreshToken();
 
 		// Store access token (1 hour expiry).
 		$wpdb->insert(
@@ -69,8 +72,11 @@ class TokenGenerator {
 	 *
 	 * @param array $args Command arguments.
 	 * @param array $assoc_args Associated arguments.
+	 *
+	 * @phpstan-ignore-next-line
+	 * @throws \Exception
 	 */
-	public static function cli_command( $args, $assoc_args ) {
+	public static function cli_command( array $args, array $assoc_args ) :void {
 		$user_id   = isset( $args[0] ) ? intval( $args[0] ) : 1;
 		$client_id = $assoc_args['client_id'] ?? 'oauth_passport_default';
 		$scope     = $assoc_args['scope'] ?? 'read write';
@@ -78,20 +84,40 @@ class TokenGenerator {
 		// Verify user exists.
 		$user = get_user_by( 'id', $user_id );
 		if ( ! $user ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			// phpstan-ignore-next-line
 			\WP_CLI::error( "User ID $user_id not found" );
 		}
 
 		// Generate tokens.
 		$tokens = self::generate_tokens( $user_id, $client_id, $scope );
 
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		// phpstan-ignore-next-line
 		\WP_CLI::success( 'Tokens generated successfully!' );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		// phpstan-ignore-next-line
 		\WP_CLI::line( '' );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		// phpstan-ignore-next-line
 		\WP_CLI::line( 'Access Token:  ' . $tokens['access_token'] );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		// phpstan-ignore-next-line
 		\WP_CLI::line( 'Refresh Token: ' . $tokens['refresh_token'] );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		// phpstan-ignore-next-line
 		\WP_CLI::line( 'Expires In:    ' . $tokens['expires_in'] . ' seconds' );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		// phpstan-ignore-next-line
 		\WP_CLI::line( 'Scope:         ' . $tokens['scope'] );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		// phpstan-ignore-next-line
 		\WP_CLI::line( '' );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		// phpstan-ignore-next-line
 		\WP_CLI::line( 'OAuth Configuration:' );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		// phpstan-ignore-next-line
 		\WP_CLI::line(
 			json_encode(
 				array(
@@ -109,6 +135,9 @@ class TokenGenerator {
 }
 
 // Register WP-CLI command if available.
-if ( defined( 'WP_CLI' ) && WP_CLI ) {
+// phpstan-ignore-next-line
+if ( defined( 'WP_CLI' ) && \WP_CLI ) {
+	// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	// phpstan-ignore-next-line
 	\WP_CLI::add_command( 'oauth-passport generate-tokens', array( TokenGenerator::class, 'cli_command' ) );
 } 

@@ -2,6 +2,9 @@
 /**
  * PKCE (Proof Key for Code Exchange) Validator
  *
+ * Implements PKCE validation according to RFC 7636 for enhanced OAuth security.
+ * Validates code challenges and verifiers to prevent authorization code interception.
+ *
  * @package OAuthPassport
  * @subpackage Auth
  */
@@ -10,28 +13,38 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Auth;
 
+use Random\RandomException;
+
 /**
  * Class PKCEValidator
  *
- * Implements PKCE validation for OAuth 2.1 security.
+ * Provides PKCE (Proof Key for Code Exchange) validation functionality
+ * to prevent authorization code interception attacks in OAuth flows.
  */
 class PKCEValidator {
 	/**
-	 * Supported code challenge methods
+	 * Supported PKCE challenge methods
 	 *
-	 * @var array
+	 * Currently only supports S256 (SHA256) as required by OAuth 2.1.
+	 * Plain text method is not supported for security reasons.
+	 *
+	 * @var array<string>
 	 */
 	private const SUPPORTED_METHODS = array( 'S256' );
 
 	/**
-	 * Minimum length for code verifier
+	 * Minimum code verifier length
+	 *
+	 * As specified in RFC 7636, code verifiers must be at least 43 characters.
 	 *
 	 * @var int
 	 */
 	private const MIN_VERIFIER_LENGTH = 43;
 
 	/**
-	 * Maximum length for code verifier
+	 * Maximum code verifier length
+	 *
+	 * As specified in RFC 7636, code verifiers must not exceed 128 characters.
 	 *
 	 * @var int
 	 */
@@ -40,10 +53,13 @@ class PKCEValidator {
 	/**
 	 * Validate PKCE code challenge and verifier
 	 *
-	 * @param string $stored_challenge The stored code challenge.
-	 * @param string $verifier The provided code verifier.
-	 * @param string $method The challenge method (default: S256).
-	 * @return bool True if valid, false otherwise.
+	 * Validates that the provided code verifier generates the stored code challenge
+	 * using the specified method. Uses timing-safe comparison to prevent attacks.
+	 *
+	 * @param string $stored_challenge The stored code challenge from authorization request
+	 * @param string $verifier The code verifier provided during token exchange
+	 * @param string $method The challenge method (default: S256)
+	 * @return bool True if verifier matches challenge, false otherwise
 	 */
 	public static function validate( string $stored_challenge, string $verifier, string $method = 'S256' ): bool {
 		// Validate method is supported.
@@ -66,7 +82,7 @@ class PKCEValidator {
 		$calculated_challenge = self::generate_challenge( $verifier, $method );
 
 		// Compare using timing-safe comparison.
-		return hash_equals( $stored_challenge, $calculated_challenge );
+		return SecurityUtils::secureCompare( $stored_challenge, $calculated_challenge );
 	}
 
 	/**
@@ -92,15 +108,14 @@ class PKCEValidator {
 	 * Generate a cryptographically secure code verifier
 	 *
 	 * @return string A random code verifier.
+	 * @throws RandomException
 	 */
 	public static function generate_verifier(): string {
 		// Generate 32 random bytes (256 bits).
 		$random_bytes = random_bytes( 32 );
 
 		// Convert to base64url.
-		$verifier = rtrim( strtr( base64_encode( $random_bytes ), '+/', '-_' ), '=' );
-
-		return $verifier;
+		return rtrim( strtr( base64_encode( $random_bytes ), '+/', '-_' ), '=' );
 	}
 
 	/**

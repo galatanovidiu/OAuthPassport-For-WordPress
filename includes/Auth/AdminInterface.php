@@ -12,6 +12,8 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Auth;
 
+use JetBrains\PhpStorm\NoReturn;
+
 /**
  * Class AdminInterface
  *
@@ -170,8 +172,9 @@ class AdminInterface {
 	/**
 	 * Render clients page
 	 */
-	public function render_clients_page(): void {
-		// Redirect to main page since we use tabs in React app.
+	#[NoReturn]
+    public function render_clients_page(): void {
+		// Redirect to the main page since we use tabs in React app.
 		wp_redirect( admin_url( 'admin.php?page=oauth-passport#clients' ) );
 		exit;
 	}
@@ -179,7 +182,8 @@ class AdminInterface {
 	/**
 	 * Render tokens page
 	 */
-	public function render_tokens_page(): void {
+	#[NoReturn]
+    public function render_tokens_page(): void {
 		// Redirect to main page since we use tabs in React app.
 		wp_redirect( admin_url( 'admin.php?page=oauth-passport#tokens' ) );
 		exit;
@@ -188,7 +192,8 @@ class AdminInterface {
 	/**
 	 * Handle revoke client action
 	 */
-	public function handle_revoke_client(): void {
+	#[NoReturn]
+    public function handle_revoke_client(): void {
 		$client_id = sanitize_text_field( wp_unslash( $_GET['client_id'] ?? '' ) );
 
 		if ( ! $client_id || ! check_admin_referer( 'oauth_passport_revoke_oauth_client_' . $client_id ) ) {
@@ -212,7 +217,8 @@ class AdminInterface {
 	/**
 	 * Handle revoke token action
 	 */
-	public function handle_revoke_token(): void {
+	#[NoReturn]
+    public function handle_revoke_token(): void {
 		$token_id = absint( $_GET['token_id'] ?? 0 );
 
 		if ( ! $token_id || ! check_admin_referer( 'oauth_passport_revoke_oauth_token_' . $token_id ) ) {
@@ -231,7 +237,8 @@ class AdminInterface {
 	/**
 	 * Handle generate client action
 	 */
-	public function handle_generate_client(): void {
+	#[NoReturn]
+    public function handle_generate_client(): void {
 		if ( ! check_admin_referer( 'oauth_passport_generate_oauth_client' ) ) {
 			wp_die( 'Invalid request' );
 		}

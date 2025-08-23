@@ -13,6 +13,8 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Auth;
 
+use OAuthPassport\OAuthPassport;
+
 /**
  * Class DiscoveryServer
  *
@@ -67,7 +69,7 @@ class DiscoveryServer {
 	 *
 	 * @param \WP $wp WordPress object.
 	 */
-	public function handle_well_known_requests( $wp ): void {
+	public function handle_well_known_requests( \WP $wp ): void {
 		if ( ! isset( $wp->query_vars['well_known_oauth'] ) ) {
 			return;
 		}
@@ -100,7 +102,7 @@ class DiscoveryServer {
 			'token_endpoint'                        => rest_url( 'oauth-passport/v1/token' ),
 			'registration_endpoint'                 => rest_url( 'oauth-passport/v1/register' ),
 			'jwks_uri'                              => rest_url( 'oauth-passport/v1/jwks' ),
-			'scopes_supported'                      => oauth_passport_get_scope_names(),
+			'scopes_supported'                      => array_keys( OAuthPassport::getAvailableScopes() ),
 			'response_types_supported'              => array( 'code' ),
 			'grant_types_supported'                 => array( 'authorization_code', 'refresh_token' ),
 			'token_endpoint_auth_methods_supported' => array( 'client_secret_post', 'client_secret_basic' ),
@@ -123,7 +125,7 @@ class DiscoveryServer {
 		$metadata = array(
 			'resource'                 => $base_url,
 			'authorization_servers'    => array( $base_url ),
-			'scopes_supported'         => oauth_passport_get_scope_names(),
+			'scopes_supported'         => array_keys( OAuthPassport::getAvailableScopes() ),
 			'bearer_methods_supported' => array( 'header' ),
 			'jwks_uri'                 => rest_url( 'oauth-passport/v1/jwks' ),
 		);

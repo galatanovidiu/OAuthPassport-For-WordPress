@@ -66,9 +66,10 @@ class JWKSServer {
 	 * Handle JWKS request
 	 *
 	 * @param \WP_REST_Request $request The request object.
+	 *
 	 * @return \WP_REST_Response
 	 */
-	public function handle_jwks_request( $request ): \WP_REST_Response {
+	public function handle_jwks_request( \WP_REST_Request $request ): \WP_REST_Response {
 		$keys = get_option( self::KEYS_OPTION, array() );
 
 		if ( empty( $keys ) ) {

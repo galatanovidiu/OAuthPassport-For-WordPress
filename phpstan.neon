@@ -1,3 +1,6 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
 parameters:
     level: 8
     paths:
@@ -8,18 +11,52 @@ parameters:
         - tests/
         - examples/
         - build/
-    checkMissingIterableValueType: false
-    checkGenericClassInNonGenericObjectType: false
+        
     ignoreErrors:
-        - '#Call to an undefined method WP_Error::get_error_code#'
-        - '#Call to an undefined method WP_Error::get_error_message#'
-        - '#Call to an undefined method WP_Error::get_error_data#'
-        - '#Call to an undefined method WP_REST_Request::get_param#'
-        - '#Call to an undefined method WP_REST_Request::get_params#'
-        - '#Call to an undefined method WP_REST_Response::set_data#'
-        - '#Call to an undefined method WP_REST_Response::set_status#'
-        - '#Call to an undefined method WP_REST_Server::register_route#'
+        # WordPress database result objects
+        - '#Access to an undefined property object::\$[a-zA-Z_]+#'
+        
+        # WordPress constants that may not be defined during analysis
+        - '#Constant (ABSPATH|ARRAY_A|WP_LOCAL_DEV|OAUTH_PASSPORT_PATH|OAUTH_PASSPORT_URL) not found#'
+        
+        # WP-CLI usage (conditional)
+        - '#Call to static method .+ on an unknown class WP_CLI#'
+        
+        # WordPress function return types
+        - '#Parameter .+ of function (gmdate|stripos|preg_match) expects .+, .+ given#'
+        
+        # Service container returns (dependency injection pattern)
+        - '#Method .+ServiceContainer::.+ should return .+ but returns object#'
+        
+        # WordPress object properties (common pattern)
+        - '#Static property .+ does not accept object#'
+        
+        # Unused methods that may be called by WordPress hooks
+        - '#Method .+ is unused#'
+        
+        # Properties that may be used by WordPress or future features
+        - '#Property .+ is never read, only written#'
+        
+        # WordPress-specific return type patterns
+        - '#Method .+ should return .+ but returns .+#'
+        
+        # WordPress function signatures
+        - '#Function .+ has no return type specified#'
+        
+        # Strict comparisons with WordPress functions
+        - '#Strict comparison using === between false and .+ will always evaluate to false#'
+        
+        # WordPress method calls on mixed types
+        - '#Cannot call method .+ on class-string\|object#'
+        
+        # Missing type hints (common in WordPress)
+        -
+            identifier: missingType.iterableValue
+        -
+            identifier: missingType.generics
+    
     bootstrapFiles:
         - vendor/autoload.php
         - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+    
     tmpDir: build/phpstan

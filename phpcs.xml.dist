@@ -47,9 +47,6 @@
     </rule>
 
     <!-- Allow modern PHP features -->
-    <rule ref="WordPress.PHP.DisallowShortTernary">
-        <severity>0</severity>
-    </rule>
 
     <!-- Enforce strict types declaration -->
     <rule ref="Generic.PHP.RequireStrictTypes"/>
@@ -93,9 +90,6 @@
     <rule ref="WordPress.Arrays.ArrayDeclarationSpacing"/>
 
     <!-- Allow null coalescing and other modern operators -->
-    <rule ref="WordPress.PHP.DisallowShortTernary">
-        <severity>0</severity>
-    </rule>
 
     <!-- Modern function and method naming for namespaced code -->
     <rule ref="PSR1.Methods.CamelCapsMethodName">

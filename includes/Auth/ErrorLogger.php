@@ -105,9 +105,9 @@ class ErrorLogger {
 					$event_type,
 					wp_json_encode( $log_entry )
 				)
-					);
+			);
+		}
 	}
-}
 
 	/**
 	 * Log authorization attempt

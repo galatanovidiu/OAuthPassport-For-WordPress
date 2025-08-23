@@ -34,6 +34,8 @@ if ( file_exists( OAUTH_PASSPORT_PATH . 'vendor/autoload.php' ) ) {
 	throw new \Exception( 'Composer autoloader not found. Please run `composer install` in the plugin directory.' );
 }
 
+
+
 /**
  * Initialize the OAuth Passport plugin.
  */

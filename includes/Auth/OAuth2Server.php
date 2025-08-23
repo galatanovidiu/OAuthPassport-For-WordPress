@@ -1,6 +1,9 @@
 <?php
 /**
- * OAuth 2.1 Server for OAuth Passport
+ * OAuth 2.1 Server Implementation
+ *
+ * Core OAuth 2.1 server that handles authorization flows, token management,
+ * and client registration according to RFC 6749 and RFC 8252 specifications.
  *
  * @package OAuthPassport
  * @subpackage Auth
@@ -13,15 +16,19 @@ namespace OAuthPassport\Auth;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_Error;
+use OAuthPassport\Container\ServiceContainer;
+use OAuthPassport\Services\AuthorizationService;
+use OAuthPassport\Services\TokenService;
 
 /**
  * Class OAuth2Server
  *
- * Main OAuth 2.1 server implementation for OAuth Passport.
+ * Implements OAuth 2.1 authorization server with PKCE support, dynamic client
+ * registration, and secure token management for WordPress integration.
  */
 class OAuth2Server {
 	/**
-	 * Whether OAuth is enabled
+	 * OAuth server enabled state
 	 *
 	 * @var bool
 	 */
@@ -70,7 +77,31 @@ class OAuth2Server {
 	private ErrorLogger $error_logger;
 
 	/**
-	 * Constructor
+	 * Authorization service instance
+	 *
+	 * @var AuthorizationService
+	 */
+	private AuthorizationService $authorization_service;
+
+	/**
+	 * Token service instance
+	 *
+	 * @var TokenService
+	 */
+	private TokenService $token_service;
+
+	/**
+	 * Client secret manager instance
+	 *
+	 * @var ClientSecretManager
+	 */
+	private ClientSecretManager $secret_manager;
+
+	/**
+	 * Initialize OAuth 2.1 server
+	 *
+	 * Sets up all required components including database schema, discovery server,
+	 * JWKS server, and admin interface. Initializes hooks if OAuth is enabled.
 	 */
 	public function __construct() {
 		$this->schema = new Schema();
@@ -78,6 +109,11 @@ class OAuth2Server {
 		$this->jwks_server = new JWKSServer();
 		$this->scope_manager = new ScopeManager();
 		$this->error_logger = new ErrorLogger();
+		
+		// Use dependency injection via service container
+		$this->authorization_service = ServiceContainer::getAuthorizationService();
+		$this->token_service = ServiceContainer::getTokenService();
+		$this->secret_manager = new ClientSecretManager();
 
 		// Initialize admin interface only in admin context.
 		if ( is_admin() ) {
@@ -238,15 +274,18 @@ class OAuth2Server {
 			}
 		}
 
-		// Generate client credentials.
-		$client_id     = 'oauth_' . wp_generate_password( 32, false );
-		$client_secret = wp_generate_password( 64, false );
+		// Generate client credentials using secure token generator.
+		$token_generator = ServiceContainer::getTokenGenerator();
+		$secret_manager = ServiceContainer::getClientSecretManager();
+		
+		$client_id     = $token_generator->generateClientId();
+		$client_secret = $token_generator->generateClientSecret();
 		$issued_at     = time();
 		
-		$hashed_secret = wp_hash_password( $client_secret );
+		$hashed_secret = $secret_manager->hashClientSecret( $client_secret );
 
 		// Generate registration access token.
-		$registration_token = $this->generate_token( 'registration' );
+		$registration_token = $token_generator->generateRegistrationToken();
 
 		// Prepare client metadata.
 		$client_data = array(
@@ -476,6 +515,9 @@ class OAuth2Server {
 
 		// Get updated client.
 		$updated_client = $this->get_client_from_db( $client->client_id );
+		if ( ! $updated_client ) {
+			return null;
+		}
 		return $this->get_client_configuration( $updated_client );
 	}
 
@@ -546,22 +588,28 @@ class OAuth2Server {
 		global $wpdb;
 		$table = $this->schema->get_table_name();
 
+		// Get all active registration tokens for this client to prevent timing attacks
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$token_data = $wpdb->get_row(
+		$tokens = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT client_id FROM %i 
+				"SELECT token_value, client_id FROM %i 
 				WHERE token_type = 'registration' 
-				AND token_value = %s 
 				AND client_id = %s
 				AND expires_at > %s",
 				$table,
-				$token,
 				$client_id,
 				gmdate( 'Y-m-d H:i:s' )
 			)
 		);
 
-		return null !== $token_data;
+		// Use timing-safe comparison to find matching token
+		foreach ( $tokens as $stored_token ) {
+			if ( SecurityUtils::validateToken( $token, $stored_token->token_value ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -946,16 +994,46 @@ class OAuth2Server {
 			return false;
 		}
 
-		// Check if the stored secret looks like a WordPress hash.
-		// WordPress can use different hash formats: $P$ (phpass) or $wp (bcrypt).
-		$prefix = substr( $client['client_secret'], 0, 3 );
-		if ( $prefix === '$P$' || $prefix === '$wp' ) {
-			// It's a hashed secret, use wp_check_password.
-			return wp_check_password( $provided_secret, $client['client_secret'] );
+		// Use the secure client secret manager for verification
+		$secret_manager = \OAuthPassport\Container\ServiceContainer::getClientSecretManager();
+		$verification_result = $secret_manager->verifyClientSecret( $provided_secret, $client['client_secret'] );
+
+		// Check if hash needs rehashing and update if needed
+		if ( $verification_result && $secret_manager->needsRehash( $client['client_secret'] ) ) {
+			$client_repository = \OAuthPassport\Container\ServiceContainer::getClientRepository();
+			$new_hash = $secret_manager->hashClientSecret( $provided_secret );
+			$client_repository->rehashClientSecret( $client['client_id'] ?? '', $new_hash );
 		}
 
-		// For plain text secrets (legacy or statically configured), use hash_equals.
-		return hash_equals( $client['client_secret'], $provided_secret );
+		return $verification_result;
+	}
+
+	/**
+	 * Rehash client secret with new secure algorithm
+	 *
+	 * @param string $client_id Client ID.
+	 * @param string $plain_secret Plain text secret.
+	 */
+	private function rehash_client_secret( string $client_id, string $plain_secret ): void {
+		if ( empty( $client_id ) ) {
+			return;
+		}
+
+		try {
+			$new_hash = $this->secret_manager->hashClientSecret( $plain_secret );
+			
+			global $wpdb;
+			$table = $this->schema->get_clients_table_name();
+			
+			$wpdb->update(
+				$table,
+				array( 'client_secret' => $new_hash ),
+				array( 'client_id' => $client_id )
+			);
+		} catch ( \Exception $e ) {
+			// Log error but don't fail the authentication
+			error_log( 'OAuth Passport: Failed to rehash client secret: ' . $e->getMessage() );
+		}
 	}
 
 	/**
@@ -982,7 +1060,21 @@ class OAuth2Server {
 	 * @return string Generated token.
 	 */
 	private function generate_token( string $prefix = 'oauth' ): string {
-		return $prefix . '_' . wp_generate_password( 32, false );
+		$token_generator = \OAuthPassport\Container\ServiceContainer::getTokenGenerator();
+		switch ( $prefix ) {
+			case 'access':
+				return $token_generator->generateAccessToken();
+			case 'refresh':
+				return $token_generator->generateRefreshToken();
+			case 'code':
+			case 'auth':
+				return $token_generator->generateAuthCode();
+			case 'registration':
+				return $token_generator->generateRegistrationToken();
+			default:
+				// For any other prefix, generate an access token as fallback
+				return $token_generator->generateAccessToken();
+		}
 	}
 
 	/**
@@ -1109,18 +1201,26 @@ class OAuth2Server {
 		global $wpdb;
 		$table = $this->schema->get_table_name();
 
+		// Get all active access tokens to prevent timing attacks
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
-		return $wpdb->get_row(
+		$tokens = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT user_id, client_id FROM %i 
+				"SELECT user_id, client_id, token_value FROM %i 
 				WHERE token_type = 'access' 
-				AND token_value = %s 
 				AND expires_at > %s",
 				$table,
-				$token,
 				gmdate( 'Y-m-d H:i:s' )
 			)
 		);
+
+		// Use timing-safe comparison to find matching token
+		foreach ( $tokens as $stored_token ) {
+			if ( SecurityUtils::validateToken( $token, $stored_token->token_value ) ) {
+				return $stored_token;
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -1180,7 +1280,8 @@ class OAuth2Server {
 		}
 
 		// Check for common development indicators.
-		if ( defined( 'WP_LOCAL_DEV' ) && WP_LOCAL_DEV ) {
+		// phpstan-ignore-next-line
+		if ( defined( 'WP_LOCAL_DEV' ) && \WP_LOCAL_DEV ) {
 			return true;
 		}
 
@@ -1438,7 +1539,7 @@ class OAuth2Server {
 					<?php if ( ! empty( $client->client_uri ) ) : ?>
 						<div class="oauth-client-uri">
 							<a href="<?php echo esc_url( $client->client_uri ); ?>" target="_blank" rel="noopener noreferrer">
-								<?php echo esc_html( wp_parse_url( $client->client_uri, PHP_URL_HOST ) ); ?>
+								<?php echo esc_html( wp_parse_url( $client->client_uri, PHP_URL_HOST ) ?: $client->client_uri ); ?>
 							</a>
 						</div>
 					<?php endif; ?>
@@ -1468,7 +1569,7 @@ class OAuth2Server {
 					<input type="hidden" name="redirect_uri" value="<?php echo esc_attr( $redirect_uri ); ?>">
 					<input type="hidden" name="code_challenge" value="<?php echo esc_attr( $code_challenge ); ?>">
 					<input type="hidden" name="code_challenge_method" value="S256">
-					<input type="hidden" name="state" value="<?php echo esc_attr( $state ); ?>">
+					<input type="hidden" name="state" value="<?php echo esc_attr( $state ?? '' ); ?>">
 					<input type="hidden" name="scope" value="<?php echo esc_attr( $scope ); ?>">
 
 					<div class="oauth-actions">
