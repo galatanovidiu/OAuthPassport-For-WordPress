@@ -47,18 +47,8 @@ add_action( 'rest_api_init', function() {
 } );
 
 function myplugin_check_admin_scope() {
-	// First check if user is logged in.
-	if ( ! is_user_logged_in() ) {
-		return false;
-	}
-	
-	// If OAuth authenticated, check for admin scope.
-	if ( oauth_passport_get_current_token() ) {
-		return oauth_passport_user_has_scope( 'admin' );
-	}
-	
-	// For non-OAuth requests, check WordPress capabilities.
-	return current_user_can( 'manage_options' );
+	// Use the new unified permission checker
+	return oauth_passport_user_can( 'admin', 'manage_options' );
 }
 
 function myplugin_admin_action( WP_REST_Request $request ) {
@@ -86,20 +76,8 @@ add_action( 'rest_api_init', function() {
 		'methods'             => 'POST',
 		'callback'            => 'myplugin_publish_post',
 		'permission_callback' => function() {
-			// Check if user can publish posts.
-			if ( ! is_user_logged_in() ) {
-				return new WP_Error( 'not_logged_in', 'Authentication required', array( 'status' => 401 ) );
-			}
-			
-			// For OAuth requests, check scope.
-			if ( oauth_passport_get_current_token() ) {
-				if ( ! oauth_passport_user_has_scope( 'posts:publish' ) ) {
-					return new WP_Error( 'insufficient_scope', 'Required scope: posts:publish', array( 'status' => 403 ) );
-				}
-			}
-			
-			// Also check WordPress capability.
-			return current_user_can( 'publish_posts' );
+			// Check if user can publish posts using the unified approach
+			return oauth_passport_user_can( 'write', 'publish_posts' );
 		},
 	) );
 } );
@@ -114,7 +92,7 @@ add_action( 'init', function() {
 			'https://myapp.com/oauth/callback',
 			array(
 				'client_name' => 'My Custom Application',
-				'scope'       => 'read write posts:publish',
+				'scope'       => 'read write',
 			)
 		);
 	}
