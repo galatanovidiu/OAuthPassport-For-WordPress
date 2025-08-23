@@ -63,6 +63,11 @@ class Schema {
 	public function create_tables(): void {
 		$this->create_tokens_table();
 		$this->create_clients_table();
+		
+		// Set initial schema version
+		if ( ! get_option( 'oauth_passport_schema_version' ) ) {
+			update_option( 'oauth_passport_schema_version', '1.1.0' );
+		}
 	}
 
 	/**
@@ -75,9 +80,14 @@ class Schema {
 
 		$charset_collate = $wpdb->get_charset_collate();
 
+		// Use different column types based on database type
+		$token_type_column = $this->is_sqlite() 
+			? "token_type VARCHAR(20) NOT NULL CHECK (token_type IN ('code', 'access', 'registration', 'refresh'))"
+			: "token_type ENUM('code', 'access', 'registration', 'refresh') NOT NULL";
+
 		$sql = "CREATE TABLE IF NOT EXISTS {$this->tokens_table} (
 			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			token_type ENUM('code', 'access', 'registration', 'refresh') NOT NULL,
+			{$token_type_column},
 			token_value VARCHAR(255) UNIQUE NOT NULL,
 			client_id VARCHAR(255) NOT NULL,
 			user_id BIGINT NOT NULL,
@@ -203,44 +213,118 @@ class Schema {
 	public function upgrade_schema(): void {
 		global $wpdb;
 
-		// Check if refresh token type already exists.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$column_info = $wpdb->get_results(
-			$wpdb->prepare(
-				"SHOW COLUMNS FROM %i WHERE Field = 'token_type'",
-				$this->tokens_table
-			)
-		);
+		// Check if we've already done this upgrade
+		$schema_version = get_option( 'oauth_passport_schema_version', '1.0.0' );
+		if ( version_compare( $schema_version, '1.1.0', '>=' ) ) {
+			return; // Already upgraded
+		}
 
-		if ( ! empty( $column_info ) && false === strpos( $column_info[0]->Type, 'refresh' ) ) {
-			// Add refresh to the enum.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange
-			$wpdb->query(
+		// For SQLite, we don't need to modify the enum as it uses TEXT
+		// For MySQL, check if refresh token type already exists
+		if ( ! $this->is_sqlite() ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$column_info = $wpdb->get_results(
 				$wpdb->prepare(
-					"ALTER TABLE %i MODIFY token_type ENUM('code', 'access', 'registration', 'refresh') NOT NULL",
+					"SHOW COLUMNS FROM %i WHERE Field = 'token_type'",
 					$this->tokens_table
 				)
 			);
+
+			if ( ! empty( $column_info ) && false === strpos( $column_info[0]->Type, 'refresh' ) ) {
+				// Add refresh to the enum.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange
+				$wpdb->query(
+					$wpdb->prepare(
+						"ALTER TABLE %i MODIFY token_type ENUM('code', 'access', 'registration', 'refresh') NOT NULL",
+						$this->tokens_table
+					)
+				);
+			}
 		}
 
-		// Check if scope column exists.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$scope_exists = $wpdb->get_var(
-			$wpdb->prepare(
-				"SHOW COLUMNS FROM %i LIKE 'scope'",
-				$this->tokens_table
-			)
-		);
+		// Check if scope column exists using a database-agnostic approach.
+		$scope_exists = $this->column_exists( $this->tokens_table, 'scope' );
 
 		if ( ! $scope_exists ) {
 			// Add scope column.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange
 			$wpdb->query(
 				$wpdb->prepare(
-					'ALTER TABLE %i ADD COLUMN scope VARCHAR(255) AFTER code_challenge',
+					'ALTER TABLE %i ADD COLUMN scope VARCHAR(255)',
 					$this->tokens_table
 				)
 			);
 		}
+
+		// Update schema version to indicate upgrade is complete
+		update_option( 'oauth_passport_schema_version', '1.1.0' );
+	}
+
+	/**
+	 * Check if a column exists in a table (database-agnostic)
+	 *
+	 * @param string $table_name Table name.
+	 * @param string $column_name Column name.
+	 * @return bool True if column exists, false otherwise.
+	 */
+	private function column_exists( string $table_name, string $column_name ): bool {
+		global $wpdb;
+
+		// Use a simple approach: try to select from the column and catch any errors
+		$wpdb->suppress_errors( true );
+		
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$result = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(%i) FROM %i WHERE 1=0",
+				$column_name,
+				$table_name
+			)
+		);
+
+		$column_exists = ( false !== $result && empty( $wpdb->last_error ) );
+		
+		$wpdb->suppress_errors( false );
+		
+		return $column_exists;
+	}
+
+	/**
+	 * Check if we're using SQLite
+	 *
+	 * @return bool True if using SQLite, false otherwise.
+	 */
+	private function is_sqlite(): bool {
+		global $wpdb;
+		
+		// Check if we're using SQLite integration plugin
+		if ( defined( 'DATABASE_TYPE' ) && 'sqlite' === DATABASE_TYPE ) {
+			return true;
+		}
+		
+		// Check if wpdb is using SQLite
+		if ( method_exists( $wpdb, 'db_version' ) ) {
+			$version = $wpdb->db_version();
+			return false !== stripos( $version, 'sqlite' );
+		}
+		
+		// Check the database class
+		return false !== stripos( get_class( $wpdb ), 'sqlite' );
+	}
+
+	/**
+	 * Reset schema version (for testing purposes)
+	 */
+	public function reset_schema_version(): void {
+		delete_option( 'oauth_passport_schema_version' );
+	}
+
+	/**
+	 * Get current schema version
+	 *
+	 * @return string Current schema version.
+	 */
+	public function get_schema_version(): string {
+		return get_option( 'oauth_passport_schema_version', '1.0.0' );
 	}
 } 
