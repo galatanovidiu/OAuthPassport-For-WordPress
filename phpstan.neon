@@ -1,0 +1,25 @@
+parameters:
+    level: 8
+    paths:
+        - includes/
+        - oauth-passport.php
+    excludePaths:
+        - vendor/
+        - tests/
+        - examples/
+        - build/
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false
+    ignoreErrors:
+        - '#Call to an undefined method WP_Error::get_error_code#'
+        - '#Call to an undefined method WP_Error::get_error_message#'
+        - '#Call to an undefined method WP_Error::get_error_data#'
+        - '#Call to an undefined method WP_REST_Request::get_param#'
+        - '#Call to an undefined method WP_REST_Request::get_params#'
+        - '#Call to an undefined method WP_REST_Response::set_data#'
+        - '#Call to an undefined method WP_REST_Response::set_status#'
+        - '#Call to an undefined method WP_REST_Server::register_route#'
+    bootstrapFiles:
+        - vendor/autoload.php
+        - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+    tmpDir: build/phpstan
