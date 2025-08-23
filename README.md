@@ -124,6 +124,11 @@ add_action('init', function() {
         }
     }
 });
+
+// Use the unified permission checker (recommended)
+function my_permission_callback() {
+    return oauth_passport_user_can('write', 'edit_posts');
+}
 ```
 
 ### Adding Custom Scopes
@@ -134,6 +139,76 @@ add_filter('oauth_passport_scopes', function($scopes) {
     $scopes['posts:publish'] = 'Publish posts';
     $scopes['media:upload'] = 'Upload media files';
     $scopes['comments:moderate'] = 'Moderate comments';
+    return $scopes;
+});
+```
+
+### Using the Unified Permission System
+
+The plugin provides a unified way to check permissions that works for both OAuth and regular WordPress requests:
+
+```php
+// Check if user can read (OAuth scope or WordPress capability)
+if (oauth_passport_user_can('read', 'read')) {
+    // User can read content
+}
+
+// Check if user can write (OAuth scope or WordPress capability)
+if (oauth_passport_user_can('write', 'edit_posts')) {
+    // User can edit posts
+}
+
+// Check if user has admin access (OAuth scope or WordPress capability)
+if (oauth_passport_user_can('admin', 'manage_options')) {
+    // User has admin privileges
+}
+```
+
+This approach automatically:
+- Checks OAuth scopes for OAuth-authenticated requests
+- Falls back to WordPress capabilities for regular requests
+- Provides a consistent API for both authentication methods
+
+## OAuth Scopes
+
+The implementation supports the following default scopes:
+
+- **read** - Read your content and data
+- **write** - Create and edit content  
+- **admin** - Manage site settings and users
+
+These scopes are automatically mapped to WordPress capabilities:
+
+- `read` → `read` capability
+- `write` → `edit_posts`, `publish_posts`, `edit_pages`, `publish_pages`, `upload_files` capabilities
+- `admin` → `manage_options`, `list_users`, `edit_users`, `delete_users`, `manage_categories` capabilities
+
+### Centralized Scope Management
+
+All scope definitions are centralized in the `ScopeManager` class. This ensures consistency across the entire plugin:
+
+```php
+// Get all available scopes with descriptions
+$scopes = oauth_passport_get_available_scopes();
+
+// Get just the scope names
+$scope_names = oauth_passport_get_scope_names();
+
+// Get default scopes
+$default_scopes = oauth_passport_get_default_scopes();
+
+// Direct access to constants
+$scopes = \OAuthPassport\Auth\ScopeManager::AVAILABLE_SCOPES;
+$defaults = \OAuthPassport\Auth\ScopeManager::DEFAULT_SCOPES;
+```
+
+### Adding Custom Scopes
+
+Custom scopes can be added through WordPress filters:
+
+```php
+add_filter('oauth_passport_scopes', function($scopes) {
+    $scopes['custom:scope'] = 'Description of custom scope';
     return $scopes;
 });
 ```
