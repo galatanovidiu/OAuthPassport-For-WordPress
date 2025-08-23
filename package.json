@@ -30,7 +30,9 @@
         "packages-update": "wp-scripts packages-update",
         "plugin-zip": "wp-scripts plugin-zip",
         "plugin-zip:build": "composer install --no-dev && pnpm run build && pnpm run plugin-zip",
-        "clean": "rm -rf build"
+        "clean": "rm -rf build",
+        "test": "wp-env run tests-wordpress bash -c \"cd /var/www/html/wp-content/plugins/OAuthPassport && vendor/bin/phpunit --configuration phpunit-wp-env.xml\"",
+        "test:coverage": "wp-env run tests-wordpress bash -c \"cd /var/www/html/wp-content/plugins/OAuthPassport && vendor/bin/phpunit --configuration phpunit-wp-env.xml --coverage-html coverage\""
     },
     "dependencies": {
         "@wordpress/api-fetch": "^7.22.0",
