@@ -1,15 +1,83 @@
 {
-    "name": "oauthpassport/oauth-passport",
-    "description": "OAuth 2.1 authentication server for WordPress",
-    "type": "wordpress-plugin",
-    "license": "GPL-2.0-or-later",
-    "minimum-stability": "stable",
-    "require": {
-        "php": ">=8.0"
-    },
-    "autoload": {
-        "psr-4": {
-            "OAuthPassport\\": "includes/"
-        }
-    }
-} 
+	"name": "oauthpassport/oauth-passport",
+	"description": "OAuth 2.1 authentication server for WordPress",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"minimum-stability": "stable",
+	"prefer-stable": true,
+	"require": {
+		"php": ">=8.1"
+	},
+	"require-dev": {
+		"phpunit/phpunit": "^10.0",
+		"squizlabs/php_codesniffer": "^3.7",
+		"phpcompatibility/php-compatibility": "^9.3",
+		"dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+		"wp-coding-standards/wpcs": "^3.0",
+		"phpstan/phpstan": "^1.10",
+		"roave/security-advisories": "dev-latest"
+	},
+	"autoload": {
+		"psr-4": {
+			"OAuthPassport\\": "includes/"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"OAuthPassport\\Tests\\": "tests/"
+		}
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		},
+		"optimize-autoloader": true,
+		"sort-packages": true
+	},
+	"scripts": {
+		"test": "phpunit",
+		"test:wp-env": "wp-env run tests-wordpress bash -c \"cd /var/www/html/wp-content/plugins/OAuthPassport && vendor/bin/phpunit --configuration phpunit-wp-env.xml\"",
+		"test:coverage": "phpunit --coverage-html coverage",
+		"test:coverage:wp-env": "wp-env run tests-wordpress bash -c \"cd /var/www/html/wp-content/plugins/OAuthPassport && vendor/bin/phpunit --configuration phpunit-wp-env.xml --coverage-html coverage\"",
+		"phpcs": "phpcs --standard=phpcs.xml.dist",
+		"phpcbf": "phpcbf --standard=phpcs.xml.dist",
+		"phpstan": "phpstan analyse",
+		"security-check": "composer audit",
+		"lint": [
+			"@phpcs",
+			"@phpstan"
+		],
+		"fix": "@phpcbf",
+		"check": [
+			"@lint",
+			"@test"
+		]
+	},
+	"extra": {
+		"wordpress-plugin-slug": "oauth-passport",
+		"installer-name": "oauth-passport"
+	},
+	"keywords": [
+		"wordpress",
+		"plugin",
+		"oauth",
+		"oauth2",
+		"oauth2.1",
+		"authentication",
+		"authorization",
+		"jwt",
+		"api"
+	],
+	"authors": [
+		{
+			"name": "Ovidiu Galatan",
+			"email": "galatanovidiu@gmail.com",
+			"homepage": "https://github.com/galatanovidiu"
+		}
+	],
+	"support": {
+		"issues": "https://github.com/galatanovidiu/oauth-passport/issues",
+		"source": "https://github.com/galatanovidiu/oauth-passport",
+		"docs": "https://github.com/galatanovidiu/oauth-passport/wiki"
+	}
+}
