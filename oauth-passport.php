@@ -20,15 +20,12 @@ declare(strict_types=1);
 namespace OAuthPassport;
 
 use OAuthPassport\Auth\OAuth2Server;
-use OAuthPassport\Auth\AdminInterface;
 use OAuthPassport\API\AdminController;
 
 define( 'OAUTH_PASSPORT_VERSION', '0.1.0' );
 define( 'OAUTH_PASSPORT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'OAUTH_PASSPORT_URL', plugin_dir_url( __FILE__ ) );
 
-// Load helper functions.
-require_once OAUTH_PASSPORT_PATH . 'includes/functions.php';
 
 // Load Composer autoloader.
 if ( file_exists( OAUTH_PASSPORT_PATH . 'vendor/autoload.php' ) ) {
