@@ -71,25 +71,60 @@ function oauth_passport_user_has_scope( string $scope ): bool {
 }
 
 /**
+ * Check if the current user can perform an action (OAuth scope or WordPress capability).
+ *
+ * This function provides a unified way to check permissions for both OAuth and regular WordPress requests.
+ * For OAuth requests, it checks if the user has the required scope.
+ * For regular requests, it checks WordPress capabilities.
+ *
+ * @param string $required_scope The OAuth scope required (e.g., 'read', 'write', 'admin').
+ * @param string $fallback_capability The WordPress capability to check if not OAuth authenticated.
+ * @return bool True if the user can perform the action, false otherwise.
+ */
+function oauth_passport_user_can( string $required_scope, string $fallback_capability = '' ): bool {
+	$token = oauth_passport_get_current_token();
+	
+	if ( $token ) {
+		// OAuth request - check scope
+		return oauth_passport_user_has_scope( $required_scope );
+	}
+	
+	// Regular WordPress request - check capability
+	if ( empty( $fallback_capability ) ) {
+		// Use the centralized scope manager to get capabilities
+		$scope_manager = new \OAuthPassport\Auth\ScopeManager();
+		$capabilities = $scope_manager->get_capabilities_for_scope( $required_scope );
+		$fallback_capability = ! empty( $capabilities ) ? $capabilities[0] : 'read';
+	}
+	
+	return current_user_can( $fallback_capability );
+}
+
+/**
  * Get all available OAuth scopes.
  *
  * @return array Array of scope => description pairs.
  */
 function oauth_passport_get_available_scopes(): array {
-	$default_scopes = array(
-		'read'       => __( 'Read access to resources', 'oauth-passport' ),
-		'write'      => __( 'Write access to resources', 'oauth-passport' ),
-		'admin'      => __( 'Administrative access', 'oauth-passport' ),
-		'user:read'  => __( 'Read user information', 'oauth-passport' ),
-		'user:write' => __( 'Modify user information', 'oauth-passport' ),
-	);
+	return \OAuthPassport\Auth\ScopeManager::get_scopes();
+}
 
-	/**
-	 * Filter the available OAuth scopes.
-	 *
-	 * @param array $scopes Array of scope => description pairs.
-	 */
-	return apply_filters( 'oauth_passport_scopes', $default_scopes );
+/**
+ * Get default OAuth scopes.
+ *
+ * @return array Array of default scope names.
+ */
+function oauth_passport_get_default_scopes(): array {
+	return \OAuthPassport\Auth\ScopeManager::get_default_scopes();
+}
+
+/**
+ * Get scope names (keys only).
+ *
+ * @return array Array of scope names.
+ */
+function oauth_passport_get_scope_names(): array {
+	return array_keys( \OAuthPassport\Auth\ScopeManager::get_scopes() );
 }
 
 /**

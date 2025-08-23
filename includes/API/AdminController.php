@@ -161,7 +161,7 @@ class AdminController extends WP_REST_Controller {
 	public function create_client( WP_REST_Request $request ) {
 		$client_name  = sanitize_text_field( $request->get_param( 'client_name' ) );
 		$redirect_uri = esc_url_raw( $request->get_param( 'redirect_uri' ) );
-		$scopes       = $request->get_param( 'scopes' ) ? $request->get_param( 'scopes' ) : array( 'read', 'write' );
+		$scopes       = $request->get_param( 'scopes' ) ? $request->get_param( 'scopes' ) : ScopeManager::get_default_scopes();
 
 		if ( ! $client_name || ! $redirect_uri ) {
 			return new WP_Error( 'missing_params', 'Client name and redirect URI are required', array( 'status' => 400 ) );
@@ -324,7 +324,7 @@ class AdminController extends WP_REST_Controller {
 				'type'        => 'array',
 				'items'       => array( 'type' => 'string' ),
 				'description' => 'OAuth scopes',
-				'default'     => array( 'read', 'write' ),
+				'default'     => ScopeManager::get_default_scopes(),
 			),
 		);
 	}

@@ -23,12 +23,10 @@ class ScopeManager {
 	 *
 	 * @var array
 	 */
-	private const AVAILABLE_SCOPES = array(
-		'read'       => 'Read access to protected resources',
-		'write'      => 'Write access to protected resources',
-		'admin'      => 'Administrative access',
-		'user:read'  => 'Read user information',
-		'user:write' => 'Modify user information',
+	public const AVAILABLE_SCOPES = array(
+		'read'  => 'Read your content and data',
+		'write' => 'Create and edit content',
+		'admin' => 'Manage site settings and users',
 	);
 
 	/**
@@ -36,7 +34,25 @@ class ScopeManager {
 	 *
 	 * @var array
 	 */
-	private const DEFAULT_SCOPES = array( 'read', 'write' );
+	public const DEFAULT_SCOPES = array( 'read' );
+
+	/**
+	 * Get all available scopes (static method for global access)
+	 *
+	 * @return array Array of scope => description.
+	 */
+	public static function get_scopes(): array {
+		return apply_filters( 'oauth_passport_scopes', self::AVAILABLE_SCOPES );
+	}
+
+	/**
+	 * Get default scopes (static method for global access)
+	 *
+	 * @return array Array of default scope names.
+	 */
+	public static function get_default_scopes(): array {
+		return apply_filters( 'oauth_passport_default_scopes', self::DEFAULT_SCOPES );
+	}
 
 	/**
 	 * Get all available scopes
@@ -44,16 +60,7 @@ class ScopeManager {
 	 * @return array Array of scope => description.
 	 */
 	public function get_available_scopes(): array {
-		return apply_filters( 'oauth_passport_available_scopes', self::AVAILABLE_SCOPES );
-	}
-
-	/**
-	 * Get default scopes
-	 *
-	 * @return array Array of default scope names.
-	 */
-	public function get_default_scopes(): array {
-		return apply_filters( 'oauth_passport_default_scopes', self::DEFAULT_SCOPES );
+		return self::get_scopes();
 	}
 
 	/**
@@ -184,11 +191,9 @@ class ScopeManager {
 	 */
 	public function get_capabilities_for_scope( string $scope ): array {
 		$scope_capabilities = array(
-			'read'       => array( 'read' ),
-			'write'      => array( 'edit_posts', 'publish_posts' ),
-			'admin'      => array( 'manage_options' ),
-			'user:read'  => array( 'list_users' ),
-			'user:write' => array( 'edit_users' ),
+			'read'  => array( 'read' ),
+			'write' => array( 'edit_posts', 'publish_posts', 'edit_pages', 'publish_pages', 'upload_files' ),
+			'admin' => array( 'manage_options', 'list_users', 'edit_users', 'delete_users', 'manage_categories' ),
 		);
 
 		$scope_capabilities = apply_filters( 'oauth_passport_scope_capabilities', $scope_capabilities );

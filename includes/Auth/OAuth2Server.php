@@ -256,7 +256,7 @@ class OAuth2Server {
 			'redirect_uris'             => wp_json_encode( $params['redirect_uris'] ),
 			'grant_types'               => wp_json_encode( $params['grant_types'] ?? array( 'authorization_code' ) ),
 			'response_types'            => wp_json_encode( $params['response_types'] ?? array( 'code' ) ),
-			'scope'                     => sanitize_text_field( $params['scope'] ?? 'read write' ),
+			'scope'                     => $params['scope'] ?? implode( ' ', ScopeManager::get_default_scopes() ),
 			'contacts'                  => wp_json_encode( $params['contacts'] ?? array() ),
 			'logo_uri'                  => esc_url_raw( $params['logo_uri'] ?? '' ),
 			'client_uri'                => esc_url_raw( $params['client_uri'] ?? '' ),
@@ -299,7 +299,7 @@ class OAuth2Server {
 			'redirect_uris'                 => $params['redirect_uris'],
 			'grant_types'                   => $params['grant_types'] ?? array( 'authorization_code' ),
 			'response_types'                => $params['response_types'] ?? array( 'code' ),
-			'scope'                         => $params['scope'] ?? 'read write',
+			'scope'                         => $params['scope'] ?? implode( ' ', ScopeManager::get_default_scopes() ),
 			'token_endpoint_auth_method'    => $params['token_endpoint_auth_method'] ?? 'client_secret_post',
 		);
 
@@ -595,7 +595,7 @@ class OAuth2Server {
 		$redirect_uri   = $request->get_param( 'redirect_uri' );
 		$code_challenge = $request->get_param( 'code_challenge' );
 		$state          = $request->get_param( 'state' );
-		$scope          = $request->get_param( 'scope' ) ?? 'read write';
+		$scope          = $request->get_param( 'scope' ) ?? implode( ' ', ScopeManager::get_default_scopes() );
 
 		// Validate client.
 		$client = $this->get_client( $client_id );
