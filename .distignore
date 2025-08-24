@@ -1,0 +1,54 @@
+# Development files
+src/
+/src/
+/node_modules/
+node_modules/
+package.json
+package-lock.json
+.git/
+.gitignore
+.distignore
+
+# Development tools
+phpcs.xml.dist
+phpstan.neon
+phpstan.neon.dist
+phpunit.xml.dist
+phpunit-wp-env.xml
+.phpstan/
+
+# Testing
+/tests/
+/.phpunit.result.cache
+
+# Development notes
+/_notes/
+/bin/
+/examples/
+
+# IDE and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# CI/CD
+.github/
+*.yml
+*.yaml
+
+# Logs and temporary files
+*.log
+/coverage/
+
+# Build artifacts (keep only final build)
+# Note: /build/ should be included as it contains the compiled JS/CSS
+
+# Personal files
+CLAUDE.local.md
+/.claude/
+
+# Composer dev dependencies will be excluded by running composer install --no-dev
