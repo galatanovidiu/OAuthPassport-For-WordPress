@@ -1,0 +1,99 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on version tags like v1.0.0, v1.2.3, etc.
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.0'
+        extensions: mbstring, xml, zip
+        tools: composer
+
+    - name: Get version from tag
+      id: get_version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Install Node.js dependencies
+      run: npm ci
+
+    - name: Install Composer dependencies (production only)
+      run: composer install --no-dev --optimize-autoloader --no-interaction
+
+    - name: Build assets
+      run: npm run build
+
+    - name: Create plugin zip
+      run: npm run plugin-zip
+
+    - name: Verify zip contents
+      run: |
+        echo "Contents of the plugin zip file:"
+        unzip -l oauth-passport.zip | head -50
+        echo "..."
+        echo "Total files: $(unzip -l oauth-passport.zip | tail -1)"
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.tag_name }}
+        release_name: OAuth Passport ${{ steps.get_version.outputs.version }}
+        draft: false
+        prerelease: false
+        body: |
+          ## OAuth Passport ${{ steps.get_version.outputs.version }}
+          
+          WordPress OAuth 2.1 authorization server plugin.
+          
+          ### Installation
+          1. Download the `oauth-passport.zip` file below
+          2. Upload to your WordPress site via Plugins > Add New > Upload Plugin
+          3. Activate the plugin
+          4. Configure at Settings > OAuth Passport
+          
+          ### Requirements
+          - WordPress 6.4+
+          - PHP 8.0+
+          - HTTPS (production)
+          
+          ### Documentation
+          See the [docs/](https://github.com/${{ github.repository }}/tree/main/docs) folder for complete documentation.
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./oauth-passport.zip
+        asset_name: oauth-passport.zip
+        asset_content_type: application/zip
+
+    - name: Upload to WordPress.org (optional)
+      if: false # Disabled by default - enable when ready for WordPress.org
+      run: |
+        echo "WordPress.org deployment would go here"
+        echo "You can integrate with the WordPress.org SVN repository"
+        echo "or use actions like 10up/action-wordpress-plugin-deploy"

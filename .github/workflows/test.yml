@@ -1,0 +1,76 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        php: ['8.0', '8.1', '8.2', '8.3']
+        wordpress: ['6.4', '6.5', '6.6', 'latest']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php }}
+        extensions: mbstring, xml, zip, mysqli
+        tools: composer, phpunit
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install Composer dependencies
+      run: composer install --prefer-dist --no-progress
+
+    - name: Install Node.js dependencies
+      run: npm ci
+
+    - name: Build assets
+      run: npm run build
+
+    - name: Run PHPStan
+      run: vendor/bin/phpstan analyse --no-progress
+
+    - name: Run PHPCS
+      run: vendor/bin/phpcs
+
+    - name: Run PHPUnit tests
+      run: vendor/bin/phpunit
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install Node.js dependencies
+      run: npm ci
+
+    - name: Run ESLint
+      run: npm run lint:js
+
+    - name: Run CSS Lint
+      run: npm run lint:css
+
+    - name: Check formatting
+      run: npm run format -- --check
