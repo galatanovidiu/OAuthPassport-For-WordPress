@@ -59,4 +59,4 @@ parameters:
         - vendor/autoload.php
         - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
     
-    tmpDir: build/phpstan
+    tmpDir: .phpstan
