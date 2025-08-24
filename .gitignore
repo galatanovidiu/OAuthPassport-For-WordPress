@@ -25,3 +25,6 @@ Thumbs.db
 # Tests
 /tests/coverage/
 .phpunit.result.cache 
+/.claude/
+/.phpstan/
+/CLAUDE.local.md
