@@ -19,6 +19,7 @@
 		"includes",
 		"vendor",
 		"oauth-passport.php",
+		"readme.txt",
 		"docs"
 	],
 	"scripts": {

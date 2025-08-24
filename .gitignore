@@ -28,3 +28,5 @@ Thumbs.db
 /.claude/
 /.phpstan/
 /CLAUDE.local.md
+/oauth-passport.zip
+/oauth-passport/
