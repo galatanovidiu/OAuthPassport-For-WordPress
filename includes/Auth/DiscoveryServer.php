@@ -138,6 +138,32 @@ class DiscoveryServer {
 	}
 
 	/**
+	 * Handle discovery request (for REST API compatibility)
+	 *
+	 * @param \WP_REST_Request $request The request object.
+	 * @return array Authorization server metadata.
+	 */
+	public function handle_request( \WP_REST_Request $request ): array {
+		$base_url = untrailingslashit( home_url() );
+
+		$metadata = array(
+			'issuer'                                => $base_url,
+			'authorization_endpoint'                => rest_url( 'oauth-passport/v1/authorize' ),
+			'token_endpoint'                        => rest_url( 'oauth-passport/v1/token' ),
+			'registration_endpoint'                 => rest_url( 'oauth-passport/v1/register' ),
+			'jwks_uri'                              => rest_url( 'oauth-passport/v1/jwks' ),
+			'scopes_supported'                      => array_keys( OAuthPassport::getAvailableScopes() ),
+			'response_types_supported'              => array( 'code' ),
+			'grant_types_supported'                 => array( 'authorization_code', 'refresh_token' ),
+			'token_endpoint_auth_methods_supported' => array( 'client_secret_post', 'client_secret_basic' ),
+			'code_challenge_methods_supported'      => array( 'S256' ),
+		);
+
+		// Allow filtering of metadata.
+		return apply_filters( 'oauth_passport_authorization_server_metadata', $metadata );
+	}
+
+	/**
 	 * Send JSON response
 	 *
 	 * @param array $data Response data.

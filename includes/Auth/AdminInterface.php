@@ -263,7 +263,7 @@ class AdminInterface {
 			$table,
 			array(
 				'client_id'                 => $client_id,
-				'client_secret'             => wp_hash( $client_secret ),
+				'client_secret_hash'             => wp_hash( $client_secret ),
 				'client_name'               => $client_name,
 				'redirect_uris'             => wp_json_encode( array( $redirect_uri ) ),
 				'grant_types'               => wp_json_encode( array( 'authorization_code' ) ),

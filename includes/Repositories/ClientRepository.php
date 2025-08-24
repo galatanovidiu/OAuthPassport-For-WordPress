@@ -226,7 +226,7 @@ class ClientRepository implements ClientRepositoryInterface {
 		$result = $wpdb->update(
 			$table_name,
 			array(
-				'client_secret' => $new_hash,
+				'client_secret_hash' => $new_hash,
 				'secret_version' => '2.0',
 			),
 			array( 'client_id' => $client_id ),

@@ -63,6 +63,48 @@ class JWKSServer {
 	}
 
 	/**
+	 * Handle JWKS request (for REST API compatibility)
+	 *
+	 * @param \WP_REST_Request $request The request object.
+	 *
+	 * @return array JWKS data.
+	 */
+	public function handle_request( \WP_REST_Request $request ): array {
+		$keys = get_option( self::KEYS_OPTION, array() );
+
+		if ( empty( $keys ) ) {
+			$keys = $this->generate_key_pair();
+		}
+
+		// Build JWK Set response.
+		$jwks = array(
+			'keys' => array(),
+		);
+
+		foreach ( $keys as $kid => $key_data ) {
+			// Only include public keys in JWKS.
+			if ( isset( $key_data['public_key'] ) ) {
+				$public_key = openssl_pkey_get_public( $key_data['public_key'] );
+				if ( $public_key ) {
+					$details = openssl_pkey_get_details( $public_key );
+					if ( $details && isset( $details['rsa'] ) ) {
+						$jwks['keys'][] = array(
+							'kty' => 'RSA',
+							'kid' => $kid,
+							'use' => 'sig',
+							'alg' => 'RS256',
+							'n'   => $this->base64url_encode( $details['rsa']['n'] ),
+							'e'   => $this->base64url_encode( $details['rsa']['e'] ),
+						);
+					}
+				}
+			}
+		}
+
+		return $jwks;
+	}
+
+	/**
 	 * Handle JWKS request
 	 *
 	 * @param \WP_REST_Request $request The request object.

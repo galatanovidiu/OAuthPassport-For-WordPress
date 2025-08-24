@@ -228,9 +228,153 @@ class AuthorizationService {
 		
 		if ( ! in_array( $client_id, $authorizations, true ) ) {
 			$authorizations[] = $client_id;
-			return update_user_meta( $user_id, 'oauth_passport_authorizations', $authorizations );
+			return (bool) update_user_meta( $user_id, 'oauth_passport_authorizations', $authorizations );
 		}
 		
 		return true;
+	}
+
+	/**
+	 * Process user consent for authorization
+	 *
+	 * @param int   $user_id User ID
+	 * @param array $params Authorization parameters
+	 * @param bool  $granted Whether consent was granted
+	 * @return array Authorization response
+	 * @throws \Exception If processing fails
+	 */
+	public function processUserConsent( int $user_id, array $params, bool $granted ): array {
+		if ( ! $granted ) {
+			throw new \Exception( 'User denied authorization' );
+		}
+
+		$client_id = $params['client_id'] ?? '';
+		$scope = $params['scope'] ?? 'read';
+		$code_challenge = $params['code_challenge'] ?? '';
+		$state = $params['state'] ?? '';
+
+		// Generate authorization code
+		$auth_code = $this->generateAuthorizationCode( $client_id, $user_id, $code_challenge, $scope );
+
+		// Store user authorization
+		$this->storeUserAuthorization( $user_id, $client_id );
+
+		$response = array(
+			'code' => $auth_code,
+		);
+
+		if ( ! empty( $state ) ) {
+			$response['state'] = $state;
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Validate authorization code
+	 *
+	 * @param string $code Authorization code
+	 * @param string $client_id Client ID
+	 * @param string $redirect_uri Redirect URI
+	 * @param string $code_verifier PKCE code verifier
+	 * @return array|false Authorization code data or false if invalid
+	 */
+	public function validateAuthorizationCode( string $code, string $client_id, string $redirect_uri, string $code_verifier = '' ) {
+		$auth_code = $this->token_repository->getAuthCode( $code );
+		if ( ! $auth_code ) {
+			return false;
+		}
+
+		// Validate client matches
+		if ( $auth_code->client_id !== $client_id ) {
+			return false;
+		}
+
+		// Validate PKCE if provided
+		if ( ! empty( $code_verifier ) && ! empty( $auth_code->code_challenge ) ) {
+			if ( ! PKCEValidator::validate( $auth_code->code_challenge, $code_verifier ) ) {
+				return false;
+			}
+		}
+
+		return (array) $auth_code;
+	}
+
+	/**
+	 * Validate authorization request
+	 *
+	 * @param array $params Request parameters
+	 * @return bool|array True if valid, error array if invalid
+	 */
+	public function validateAuthorizationRequest( array $params ) {
+		$required_params = array( 'client_id', 'response_type', 'redirect_uri' );
+		
+		foreach ( $required_params as $param ) {
+			if ( empty( $params[ $param ] ) ) {
+				return array(
+					'error' => 'invalid_request',
+					'error_description' => "Missing required parameter: {$param}",
+				);
+			}
+		}
+
+		// Validate client
+		$client = $this->client_repository->getClient( $params['client_id'] );
+		if ( ! $client ) {
+			return array(
+				'error' => 'invalid_client',
+				'error_description' => 'Invalid client ID',
+			);
+		}
+
+		// Validate response type
+		if ( $params['response_type'] !== 'code' ) {
+			return array(
+				'error' => 'unsupported_response_type',
+				'error_description' => 'Only "code" response type is supported',
+			);
+		}
+
+		// Validate redirect URI
+		if ( ! $this->validateRedirectUri( $client, $params['redirect_uri'] ) ) {
+			return array(
+				'error' => 'invalid_redirect_uri',
+				'error_description' => 'Invalid redirect URI',
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Validate scope
+	 *
+	 * @param string $scope Requested scope
+	 * @param array  $client Client data
+	 * @return bool True if valid
+	 */
+	public function validateScope( string $scope, array $client = array() ): bool {
+		return $this->scope_validator->validateScopes( $scope ) !== false;
+	}
+
+	/**
+	 * Format error response
+	 *
+	 * @param string $error Error code
+	 * @param string $description Error description
+	 * @param string $state State parameter
+	 * @return array Error response
+	 */
+	public function formatErrorResponse( string $error, string $description, string $state = '' ): array {
+		$response = array(
+			'error' => $error,
+			'error_description' => $description,
+		);
+
+		if ( ! empty( $state ) ) {
+			$response['state'] = $state;
+		}
+
+		return $response;
 	}
 }

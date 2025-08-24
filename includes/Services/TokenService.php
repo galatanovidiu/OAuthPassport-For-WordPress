@@ -180,15 +180,15 @@ class TokenService {
 	 */
 	private function verifyClientSecret( array $client, string $provided_secret ): bool {
 		// If client has no secret (public client), it can't be verified against a provided secret
-		if ( empty( $client['client_secret'] ) ) {
+		if ( empty( $client['client_secret_hash'] ) ) {
 			return false;
 		}
 
 		// Use the secure client secret manager for verification
-		$verification_result = $this->secret_manager->verifyClientSecret( $provided_secret, $client['client_secret'] );
+		$verification_result = $this->secret_manager->verifyClientSecret( $provided_secret, $client['client_secret_hash'] );
 
 		// Check if hash needs rehashing and update if needed
-		if ( $verification_result && $this->secret_manager->needsRehash( $client['client_secret'] ) ) {
+		if ( $verification_result && $this->secret_manager->needsRehash( $client['client_secret_hash'] ) ) {
 			$this->rehashClientSecret( $client['client_id'] ?? '', $provided_secret );
 		}
 
@@ -212,7 +212,7 @@ class TokenService {
 			$this->client_repository->updateClient(
 				$client_id,
 				array( 
-					'client_secret' => $new_hash,
+					'client_secret_hash' => $new_hash,
 					'secret_version' => '2.0',
 				)
 			);

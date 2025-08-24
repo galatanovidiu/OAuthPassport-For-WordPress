@@ -266,4 +266,183 @@ class TokenRepository implements TokenRepositoryInterface {
 
 		return $deleted ? $deleted : 0;
 	}
+
+	/**
+	 * Store authorization code (alias for storeAuthCode)
+	 *
+	 * @param string $code Authorization code
+	 * @param string $client_id Client ID
+	 * @param int    $user_id User ID
+	 * @param string $code_challenge PKCE challenge
+	 * @param string $scope Requested scope
+	 * @param int    $expires_in Expiration time in seconds
+	 * @return bool True on success
+	 */
+	public function storeAuthorizationCode( string $code, string $client_id, int $user_id, string $code_challenge, string $scope = 'read write', int $expires_in = 300 ): bool {
+		return $this->storeAuthCode( $code, $client_id, $user_id, $code_challenge, $scope, $expires_in );
+	}
+
+	/**
+	 * Get access token
+	 *
+	 * @param string $token Access token
+	 * @return array|null Token data or null if invalid
+	 */
+	public function getAccessToken( string $token ): ?array {
+		$token_data = $this->validateAccessToken( $token );
+		return $token_data ? (array) $token_data : null;
+	}
+
+	/**
+	 * Get authorization code (alias for getAuthCode)
+	 *
+	 * @param string $code Authorization code
+	 * @return array|null Code data or null if not found
+	 */
+	public function getAuthorizationCode( string $code ): ?array {
+		$code_data = $this->getAuthCode( $code );
+		return $code_data ? (array) $code_data : null;
+	}
+
+	/**
+	 * Revoke access token
+	 *
+	 * @param string $token Access token
+	 * @return bool True on success
+	 */
+	public function revokeAccessToken( string $token ): bool {
+		return $this->deleteToken( $token );
+	}
+
+	/**
+	 * Revoke refresh token
+	 *
+	 * @param string $token Refresh token
+	 * @return bool True on success
+	 */
+	public function revokeRefreshToken( string $token ): bool {
+		return $this->deleteToken( $token );
+	}
+
+	/**
+	 * Consume authorization code (delete after use)
+	 *
+	 * @param string $code Authorization code
+	 * @return bool True on success
+	 */
+	public function consumeAuthorizationCode( string $code ): bool {
+		return $this->deleteToken( $code );
+	}
+
+	/**
+	 * Get token statistics
+	 *
+	 * @return array Token statistics
+	 */
+	public function getTokenStatistics(): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$stats = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT token_type, COUNT(*) as count FROM %i WHERE expires_at > %s GROUP BY token_type",
+				$this->table_name,
+				gmdate( 'Y-m-d H:i:s' )
+			),
+			ARRAY_A
+		);
+
+		$result = array(
+			'access' => 0,
+			'refresh' => 0,
+			'code' => 0,
+		);
+
+		foreach ( $stats as $stat ) {
+			$result[ $stat['token_type'] ] = (int) $stat['count'];
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Revoke all user tokens
+	 *
+	 * @param int $user_id User ID
+	 * @return bool True on success
+	 */
+	public function revokeAllUserTokens( int $user_id ): bool {
+		global $wpdb;
+
+		$result = $wpdb->delete(
+			$this->table_name,
+			array( 'user_id' => $user_id )
+		);
+
+		return false !== $result;
+	}
+
+	/**
+	 * Revoke all client tokens
+	 *
+	 * @param string $client_id Client ID
+	 * @return bool True on success
+	 */
+	public function revokeAllClientTokens( string $client_id ): bool {
+		global $wpdb;
+
+		$result = $wpdb->delete(
+			$this->table_name,
+			array( 'client_id' => $client_id )
+		);
+
+		return false !== $result;
+	}
+
+	/**
+	 * Get user tokens
+	 *
+	 * @param int $user_id User ID
+	 * @return array Array of user tokens
+	 */
+	public function getUserTokens( int $user_id ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$tokens = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM %i WHERE user_id = %d AND expires_at > %s",
+				$this->table_name,
+				$user_id,
+				gmdate( 'Y-m-d H:i:s' )
+			),
+			ARRAY_A
+		);
+
+		return $tokens ?: array();
+	}
+
+	/**
+	 * Get client tokens
+	 *
+	 * @param string $client_id Client ID
+	 * @return array Array of client tokens
+	 */
+	public function getClientTokens( string $client_id ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$tokens = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM %i WHERE client_id = %s AND expires_at > %s",
+				$this->table_name,
+				$client_id,
+				gmdate( 'Y-m-d H:i:s' )
+			),
+			ARRAY_A
+		);
+
+		return $tokens ?: array();
+	}
+
 }

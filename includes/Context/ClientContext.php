@@ -106,7 +106,7 @@ class ClientContext {
 		// Prepare client data
 		$full_client_data = array_merge( $client_data, array(
 			'client_id' => $client_id,
-			'client_secret' => $hashed_secret,
+			'client_secret_hash' => $hashed_secret,
 			'client_id_issued_at' => time(),
 			'client_secret_expires_at' => 0, // Never expires
 		));
@@ -164,11 +164,11 @@ class ClientContext {
 	 */
 	public function verifyCredentials( string $client_id, string $client_secret ): bool {
 		$client = $this->getClient( $client_id );
-		if ( ! $client || empty( $client['client_secret'] ) ) {
+		if ( ! $client || empty( $client['client_secret_hash'] ) ) {
 			return false;
 		}
 
-		return $this->secret_manager->verifyClientSecret( $client_secret, $client['client_secret'] );
+		return $this->secret_manager->verifyClientSecret( $client_secret, $client['client_secret_hash'] );
 	}
 
 	/**
@@ -179,7 +179,7 @@ class ClientContext {
 	 */
 	public function isPublicClient( string $client_id ): bool {
 		$client = $this->getClient( $client_id );
-		return $client && empty( $client['client_secret'] );
+		return $client && empty( $client['client_secret_hash'] );
 	}
 
 	/**
@@ -195,7 +195,7 @@ class ClientContext {
 		}
 
 		// Remove sensitive data
-		unset( $client['client_secret'] );
+		unset( $client['client_secret_hash'] );
 		unset( $client['registration_access_token'] );
 
 		return $client;
