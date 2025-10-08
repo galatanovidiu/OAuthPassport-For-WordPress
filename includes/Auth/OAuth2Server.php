@@ -146,6 +146,10 @@ class OAuth2Server {
 			add_filter( 'rest_authentication_errors', array( $this, 'rest_authentication_errors' ), 20 );
 		}
 
+		// Add admin-post handler for OAuth authorization form
+		add_action( 'admin_post_oauth_passport_authorize', array( $this, 'handle_authorization_form' ) );
+		add_action( 'admin_post_nopriv_oauth_passport_authorize', array( $this, 'handle_authorization_form' ) );
+
 		// Clean up expired tokens daily.
 		if ( ! wp_next_scheduled( 'oauth_passport_cleanup' ) ) {
 			wp_schedule_event( time(), 'daily', 'oauth_passport_cleanup' );
@@ -195,7 +199,7 @@ class OAuth2Server {
 			array(
 				'methods'             => array( 'GET', 'POST' ),
 				'callback'            => array( $this, 'handle_authorize' ),
-				'permission_callback' => 'is_user_logged_in',
+				'permission_callback' => array( $this, 'authorize_permission_callback' ),
 				'args'                => array(
 					'client_id'             => array(
 						'required' => true,
@@ -241,6 +245,7 @@ class OAuth2Server {
 	 */
 	public function handle_client_registration( WP_REST_Request $request ) {
 		$params = $request->get_json_params();
+
 
 		// Validate required parameters.
 		if ( empty( $params['client_name'] ) ) {
@@ -326,6 +331,7 @@ class OAuth2Server {
 
 		// Store registration token for later validation.
 		$this->store_registration_token( $registration_token, $client_id );
+
 
 		// Return client information (RFC 7591 compliant response).
 		$response = array(
@@ -646,6 +652,7 @@ class OAuth2Server {
 		$state          = $request->get_param( 'state' );
 		$scope          = $request->get_param( 'scope' ) ?? implode( ' ', ScopeManager::get_default_scopes() );
 
+
 		// Validate required parameters.
 		if ( empty( $client_id ) ) {
 			return new WP_Error( 'invalid_request', 'Missing client_id parameter', array( 'status' => 400 ) );
@@ -654,8 +661,9 @@ class OAuth2Server {
 		// Validate client.
 		$client = $this->get_client( $client_id );
 		if ( ! $client ) {
-			return new WP_Error( 'invalid_client', 'Invalid client', array( 'status' => 400 ) );
+			return new WP_Error( 'unauthorized_client', 'The client is not authorized to request an authorization code', array( 'status' => 400 ) );
 		}
+
 
 		// Get full client details for display.
 		$client_details = $this->get_client_from_db( $client_id );
@@ -664,6 +672,7 @@ class OAuth2Server {
 		if ( ! $this->validate_redirect_uri( $client, $redirect_uri ) ) {
 			return new WP_Error( 'invalid_redirect_uri', 'Invalid redirect URI', array( 'status' => 400 ) );
 		}
+
 
 		// In test mode, return success for valid parameters (basic validation test)
 		if ( defined( 'OAUTH_PASSPORT_TEST_MODE' ) && OAUTH_PASSPORT_TEST_MODE ) {
@@ -715,6 +724,8 @@ class OAuth2Server {
 		}
 
 		$grant_type = $params['grant_type'] ?? '';
+		$client_id = $params['client_id'] ?? '';
+
 
 		// Check for required grant_type parameter
 		if ( empty( $grant_type ) ) {
@@ -793,6 +804,7 @@ class OAuth2Server {
 
 		// Delete used auth code.
 		$this->delete_auth_code( (int) $auth_code->id );
+
 
 		return rest_ensure_response(
 			array(
@@ -1052,7 +1064,6 @@ class OAuth2Server {
 			);
 		} catch ( \Exception $e ) {
 			// Log error but don't fail the authentication
-			error_log( 'OAuth Passport: Failed to rehash client secret: ' . $e->getMessage() );
 		}
 	}
 
@@ -1631,8 +1642,9 @@ class OAuth2Server {
 					<?php esc_html_e( 'Make sure you trust this application before authorizing. You can revoke access at any time from your account settings.', 'oauth-passport' ); ?>
 				</div>
 
-				<form method="post" action="<?php echo esc_url( rest_url( 'oauth-passport/v1/authorize' ) ); ?>">
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<?php wp_nonce_field( 'oauth_authorize' ); ?>
+					<input type="hidden" name="action" value="oauth_passport_authorize">
 					<input type="hidden" name="client_id" value="<?php echo esc_attr( sanitize_text_field( wp_unslash( $_GET['client_id'] ?? '' ) ) ); ?>">
 					<input type="hidden" name="redirect_uri" value="<?php echo esc_attr( $redirect_uri ); ?>">
 					<input type="hidden" name="code_challenge" value="<?php echo esc_attr( $code_challenge ); ?>">
@@ -1653,6 +1665,38 @@ class OAuth2Server {
 		</body>
 		</html>
 		<?php
+		exit;
+	}
+
+	/**
+	 * Authorization endpoint permission callback
+	 *
+	 * Redirects to login page if user is not authenticated, preserving the authorization request.
+	 *
+	 * @param WP_REST_Request $request The request object.
+	 * @return bool|WP_Error True if user is logged in, redirect to login otherwise.
+	 */
+	public function authorize_permission_callback( WP_REST_Request $request ) {
+		// Force WordPress to determine the current user from cookies
+		// This is needed because the REST API permission callback runs before user determination
+		wp_set_current_user( 0 ); // Reset first
+		$current_user_id = apply_filters( 'determine_current_user', null );
+		if ( $current_user_id ) {
+			wp_set_current_user( $current_user_id );
+		}
+
+		// If user is authenticated, allow access
+		if ( $current_user_id > 0 ) {
+			return true;
+		}
+
+		// Build login URL with redirect back to authorization endpoint
+		$params = $request->get_query_params();
+		$current_url = add_query_arg( $params, rest_url( 'oauth-passport/v1/authorize' ) );
+		$login_url = wp_login_url( $current_url );
+
+		// Perform redirect to login page
+		wp_redirect( $login_url );
 		exit;
 	}
 
@@ -1800,5 +1844,53 @@ class OAuth2Server {
 	 */
 	public function handle_jwks_request( WP_REST_Request $request ) {
 		return $this->jwks_server->handle_request( $request );
+	}
+
+	/**
+	 * Handle OAuth authorization form submission via admin-post
+	 */
+	public function handle_authorization_form(): void {
+		// Verify nonce
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) ), 'oauth_authorize' ) ) {
+			wp_die( esc_html__( 'Security check failed', 'oauth-passport' ) );
+		}
+
+		// Get form data
+		$client_id = sanitize_text_field( wp_unslash( $_POST['client_id'] ?? '' ) );
+		$redirect_uri = esc_url_raw( wp_unslash( $_POST['redirect_uri'] ?? '' ) );
+		$code_challenge = sanitize_text_field( wp_unslash( $_POST['code_challenge'] ?? '' ) );
+		$state = sanitize_text_field( wp_unslash( $_POST['state'] ?? '' ) );
+		$scope = sanitize_text_field( wp_unslash( $_POST['scope'] ?? '' ) );
+		$oauth_action = sanitize_text_field( wp_unslash( $_POST['oauth_action'] ?? '' ) );
+
+
+		// Validate client
+		$client = $this->get_client( $client_id );
+		if ( ! $client ) {
+			wp_die( esc_html__( 'Invalid client', 'oauth-passport' ) );
+		}
+
+		// Validate redirect URI
+		if ( ! $this->validate_redirect_uri( $client, $redirect_uri ) ) {
+			wp_die( esc_html__( 'Invalid redirect URI', 'oauth-passport' ) );
+		}
+
+		if ( 'allow' === $oauth_action ) {
+			// User approved - store authorization and generate code
+			$this->store_user_authorization( get_current_user_id(), $client_id );
+			$this->generate_and_redirect_auth_code( $client_id, $redirect_uri, $code_challenge, $state, $scope );
+		} else {
+			// User denied - redirect with error
+			$params = array(
+				'error'             => 'access_denied',
+				'error_description' => 'The user denied the authorization request',
+			);
+			if ( $state ) {
+				$params['state'] = $state;
+			}
+			
+			wp_redirect( add_query_arg( $params, $redirect_uri ) );
+			exit;
+		}
 	}
 } 
