@@ -16,11 +16,8 @@ Quick solutions for common OAuth issues.
 curl https://yoursite.com/.well-known/oauth-authorization-server
 curl https://yoursite.com/.well-known/oauth-protected-resource
 
-# JWKS endpoint
-curl https://yoursite.com/wp-json/oauth-passport/v1/jwks
-
 # Admin endpoints (requires authentication)
-curl https://yoursite.com/wp-json/oauth-passport/v1/admin/clients
+curl https://yoursite.com/wp-json/oauth-passport/v1/admin/endpoints
 ```
 
 ## Common Errors
@@ -107,7 +104,7 @@ Check logs at: `wp-content/debug.log`
 ```sql
 SHOW TABLES LIKE '%oauth_passport%';
 ```
-Should show: `wp_oauth_passport_tokens`, `wp_oauth_passport_clients`, `wp_oauth_passport_logs`
+Should show: `wp_oauth_passport_tokens`, `wp_oauth_passport_clients`
 
 ### Recreate Tables
 If tables are missing, deactivate and reactivate the plugin.
@@ -194,12 +191,16 @@ SELECT token_type, client_id, user_id, scope, expires_at
 FROM wp_oauth_passport_tokens 
 WHERE expires_at > NOW();
 
--- Recent errors
-SELECT * FROM wp_oauth_passport_logs 
-WHERE level = 'error' 
-ORDER BY created_at DESC 
-LIMIT 10;
+-- Token count by type
+SELECT token_type, COUNT(*) as count 
+FROM wp_oauth_passport_tokens 
+GROUP BY token_type;
 
--- Token cleanup
+-- Expired tokens
+SELECT COUNT(*) as expired_tokens
+FROM wp_oauth_passport_tokens 
+WHERE expires_at < NOW();
+
+-- Token cleanup (remove expired)
 DELETE FROM wp_oauth_passport_tokens WHERE expires_at < NOW();
 ```

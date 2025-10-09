@@ -51,13 +51,6 @@ class OAuth2Server {
 	private DiscoveryServer $discovery_server;
 
 	/**
-	 * JWKS server instance
-	 *
-	 * @var JWKSServer
-	 */
-	private JWKSServer $jwks_server;
-
-	/**
 	 * Scope manager instance
 	 *
 	 * @var ScopeManager
