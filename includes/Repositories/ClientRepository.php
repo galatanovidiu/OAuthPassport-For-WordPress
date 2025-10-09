@@ -13,15 +13,13 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Repositories;
 
-use OAuthPassport\Contracts\ClientRepositoryInterface;
-
 /**
  * Class ClientRepository
  *
  * WordPress database implementation for OAuth client storage and retrieval
  * with JSON field handling and backward compatibility support.
  */
-class ClientRepository implements ClientRepositoryInterface {
+class ClientRepository {
 
 	/**
 	 * OAuth clients database table name
@@ -53,11 +51,12 @@ class ClientRepository implements ClientRepositoryInterface {
 		global $wpdb;
 
 		// First check database for dynamically registered clients
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$db_client = $wpdb->get_row(
 			$wpdb->prepare(
-				'SELECT * FROM %i WHERE client_id = %s',
-				$this->table_name,
+				"SELECT * FROM {$table} WHERE client_id = %s",
 				$client_id
 			),
 			ARRAY_A
@@ -180,11 +179,12 @@ class ClientRepository implements ClientRepositoryInterface {
 	public function getAllClients( int $limit = 100, int $offset = 0 ): array {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$clients = $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT * FROM %i ORDER BY created_at DESC LIMIT %d OFFSET %d',
-				$this->table_name,
+				"SELECT * FROM {$table} ORDER BY created_at DESC LIMIT %d OFFSET %d",
 				$limit,
 				$offset
 			),

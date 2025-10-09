@@ -24,10 +24,6 @@ parameters:
         
         # WordPress function return types
         - '#Parameter .+ of function (gmdate|stripos|preg_match) expects .+, .+ given#'
-        
-        # Service container returns (dependency injection pattern)
-        - '#Method .+ServiceContainer::.+ should return .+ but returns object#'
-        
         # WordPress object properties (common pattern)
         - '#Static property .+ does not accept object#'
         

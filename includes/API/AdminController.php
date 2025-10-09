@@ -14,6 +14,10 @@ namespace OAuthPassport\API;
 
 use OAuthPassport\Auth\Schema;
 use OAuthPassport\Auth\ScopeManager;
+use OAuthPassport\Auth\SecureTokenGenerator;
+use OAuthPassport\Auth\ClientSecretManager;
+use OAuthPassport\Services\ClientService;
+use OAuthPassport\Services\TokenService;
 use WP_REST_Controller;
 use WP_REST_Server;
 use WP_Error;
@@ -40,14 +44,33 @@ class AdminController extends WP_REST_Controller {
 	 */
 	private ScopeManager $scope_manager;
 
+	private SecureTokenGenerator $token_generator;
+
+	private ClientSecretManager $secret_manager;
+
+	private ClientService $client_service;
+
+	private TokenService $token_service;
+
 	/**
 	 * Constructor
 	 */
-	public function __construct() {
-		$this->namespace     = 'oauth-passport/v1';
-		$this->rest_base     = 'admin';
-		$this->oauth_schema  = new Schema();
-		$this->scope_manager = new ScopeManager();
+	public function __construct( 
+		Schema $schema, 
+		ScopeManager $scope_manager, 
+		SecureTokenGenerator $token_generator, 
+		ClientSecretManager $secret_manager,
+		ClientService $client_service,
+		TokenService $token_service
+	) {
+		$this->namespace       = 'oauth-passport/v1';
+		$this->rest_base       = 'admin';
+		$this->oauth_schema    = $schema;
+		$this->scope_manager   = $scope_manager;
+		$this->token_generator = $token_generator;
+		$this->secret_manager  = $secret_manager;
+		$this->client_service  = $client_service;
+		$this->token_service   = $token_service;
 	}
 
 	/**

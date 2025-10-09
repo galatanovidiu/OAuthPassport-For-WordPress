@@ -13,11 +13,11 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Services;
 
-use OAuthPassport\Contracts\TokenGeneratorInterface;
-use OAuthPassport\Contracts\TokenRepositoryInterface;
-use OAuthPassport\Contracts\ClientRepositoryInterface;
-use OAuthPassport\Contracts\ScopeValidatorInterface;
 use OAuthPassport\Auth\PKCEValidator;
+use OAuthPassport\Auth\ScopeManager;
+use OAuthPassport\Auth\SecureTokenGenerator;
+use OAuthPassport\Repositories\ClientRepository;
+use OAuthPassport\Repositories\TokenRepository;
 
 /**
  * Class AuthorizationService
@@ -30,49 +30,49 @@ class AuthorizationService {
 	/**
 	 * Token generator
 	 *
-	 * @var TokenGeneratorInterface
+	 * @var SecureTokenGenerator
 	 */
-	private TokenGeneratorInterface $token_generator;
+	private SecureTokenGenerator $token_generator;
 
 	/**
 	 * Token repository
 	 *
-	 * @var TokenRepositoryInterface
+	 * @var TokenRepository
 	 */
-	private TokenRepositoryInterface $token_repository;
+	private TokenRepository $token_repository;
 
 	/**
 	 * Client repository
 	 *
-	 * @var ClientRepositoryInterface
+	 * @var ClientRepository
 	 */
-	private ClientRepositoryInterface $client_repository;
+	private ClientRepository $client_repository;
 
 	/**
-	 * Scope validator
+	 * Scope manager
 	 *
-	 * @var ScopeValidatorInterface
+	 * @var ScopeManager
 	 */
-	private ScopeValidatorInterface $scope_validator;
+	private ScopeManager $scope_manager;
 
 	/**
 	 * Initialize authorization service
 	 *
-	 * @param TokenGeneratorInterface  $token_generator Service for generating authorization codes
-	 * @param TokenRepositoryInterface $token_repository Repository for token storage and retrieval
-	 * @param ClientRepositoryInterface $client_repository Repository for client validation
-	 * @param ScopeValidatorInterface  $scope_validator Service for scope validation and filtering
-	 */
-	public function __construct(
-		TokenGeneratorInterface $token_generator,
-		TokenRepositoryInterface $token_repository,
-		ClientRepositoryInterface $client_repository,
-		ScopeValidatorInterface $scope_validator
-	) {
-		$this->token_generator = $token_generator;
-		$this->token_repository = $token_repository;
-		$this->client_repository = $client_repository;
-		$this->scope_validator = $scope_validator;
+     * @param SecureTokenGenerator $token_generator Service for generating authorization codes
+     * @param TokenRepository      $token_repository Repository for token storage and retrieval
+     * @param ClientRepository     $client_repository Repository for client validation
+     * @param ScopeManager         $scope_manager Service for scope validation and filtering
+     */
+    public function __construct(
+        SecureTokenGenerator $token_generator,
+        TokenRepository $token_repository,
+        ClientRepository $client_repository,
+        ScopeManager $scope_manager
+    ) {
+        $this->token_generator = $token_generator;
+        $this->token_repository = $token_repository;
+        $this->client_repository = $client_repository;
+        $this->scope_manager = $scope_manager;
 	}
 
 	/**

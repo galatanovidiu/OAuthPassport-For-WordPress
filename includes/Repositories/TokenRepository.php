@@ -13,7 +13,6 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Repositories;
 
-use OAuthPassport\Contracts\TokenRepositoryInterface;
 use OAuthPassport\Auth\SecurityUtils;
 
 /**
@@ -22,7 +21,7 @@ use OAuthPassport\Auth\SecurityUtils;
  * WordPress database implementation for OAuth token storage and retrieval
  * with secure validation and expiration management.
  */
-class TokenRepository implements TokenRepositoryInterface {
+class TokenRepository {
 
 	/**
 	 * OAuth tokens database table name
@@ -176,16 +175,17 @@ class TokenRepository implements TokenRepositoryInterface {
 	public function getAuthCode( string $code ): ?object {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		return $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT * FROM %i 
+				"SELECT * FROM {$table} 
 				WHERE token_type = 'code' 
 				AND token_value = %s 
 				AND expires_at > %s",
-				$this->table_name,
 				$code,
-				gmdate( 'Y-m-d H:i:s' )
+				current_time( 'mysql' )
 			)
 		);
 	}
@@ -199,16 +199,17 @@ class TokenRepository implements TokenRepositoryInterface {
 	public function getRefreshToken( string $token ): ?object {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		return $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT * FROM %i 
+				"SELECT * FROM {$table} 
 				WHERE token_type = 'refresh' 
 				AND token_value = %s 
 				AND expires_at > %s",
-				$this->table_name,
 				$token,
-				gmdate( 'Y-m-d H:i:s' )
+				current_time( 'mysql' )
 			)
 		);
 	}
@@ -255,12 +256,13 @@ class TokenRepository implements TokenRepositoryInterface {
 	public function cleanupExpiredTokens(): int {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
-				'DELETE FROM %i WHERE expires_at < %s',
-				$this->table_name,
-				gmdate( 'Y-m-d H:i:s' )
+				"DELETE FROM {$table} WHERE expires_at < %s",
+				current_time( 'mysql' )
 			)
 		);
 
@@ -342,12 +344,13 @@ class TokenRepository implements TokenRepositoryInterface {
 	public function getTokenStatistics(): array {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$stats = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT token_type, COUNT(*) as count FROM %i WHERE expires_at > %s GROUP BY token_type",
-				$this->table_name,
-				gmdate( 'Y-m-d H:i:s' )
+				"SELECT token_type, COUNT(*) as count FROM {$table} WHERE expires_at > %s GROUP BY token_type",
+				current_time( 'mysql' )
 			),
 			ARRAY_A
 		);
@@ -408,13 +411,14 @@ class TokenRepository implements TokenRepositoryInterface {
 	public function getUserTokens( int $user_id ): array {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$tokens = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM %i WHERE user_id = %d AND expires_at > %s",
-				$this->table_name,
+				"SELECT * FROM {$table} WHERE user_id = %d AND expires_at > %s",
 				$user_id,
-				gmdate( 'Y-m-d H:i:s' )
+				current_time( 'mysql' )
 			),
 			ARRAY_A
 		);
@@ -432,12 +436,12 @@ class TokenRepository implements TokenRepositoryInterface {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$table = esc_sql( $this->table_name );
 		$tokens = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM %i WHERE client_id = %s AND expires_at > %s",
-				$this->table_name,
+				"SELECT * FROM {$table} WHERE client_id = %s AND expires_at > %s",
 				$client_id,
-				gmdate( 'Y-m-d H:i:s' )
+				current_time( 'mysql' )
 			),
 			ARRAY_A
 		);

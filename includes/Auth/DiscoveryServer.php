@@ -13,18 +13,18 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Auth;
 
-use OAuthPassport\OAuthPassport;
-
 /**
  * Class DiscoveryServer
  *
  * Handles OAuth discovery endpoints for automatic client configuration.
  */
 class DiscoveryServer {
+	private ScopeManager $scope_manager;
 	/**
 	 * Initialize discovery server
 	 */
-	public function __construct() {
+	public function __construct( ScopeManager $scope_manager ) {
+		$this->scope_manager = $scope_manager;
 		// Hook into parse_request to handle .well-known paths.
 		add_action( 'parse_request', array( $this, 'handle_well_known_requests' ) );
 
