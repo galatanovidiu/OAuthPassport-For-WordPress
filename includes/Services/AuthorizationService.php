@@ -97,8 +97,8 @@ class AuthorizationService {
 		}
 
 		// Validate and filter scopes
-		$valid_scopes = $this->scope_validator->validateScopes( $scope );
-		$filtered_scopes = $this->scope_validator->filterScopesByUserCapabilities( $valid_scopes, $user_id );
+        $valid_scopes = $this->scope_manager->validate( $scope );
+        $filtered_scopes = $this->scope_manager->filterForUser( $valid_scopes, $user_id );
 		$final_scope = implode( ' ', $filtered_scopes );
 
 		// Generate authorization code
@@ -387,7 +387,7 @@ class AuthorizationService {
 	 * @return bool True if valid
 	 */
 	public function validateScope( string $scope, array $client = array() ): bool {
-		return $this->scope_validator->validateScopes( $scope ) !== false;
+		return ! empty( $this->scope_manager->validate( $scope ) );
 	}
 
 	/**
