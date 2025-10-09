@@ -13,7 +13,6 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Repositories;
 
-use OAuthPassport\Contracts\TokenRepositoryInterface;
 use OAuthPassport\Auth\SecurityUtils;
 
 /**
@@ -22,7 +21,7 @@ use OAuthPassport\Auth\SecurityUtils;
  * WordPress database implementation for OAuth token storage and retrieval
  * with secure validation and expiration management.
  */
-class TokenRepository implements TokenRepositoryInterface {
+class TokenRepository {
 
 	/**
 	 * OAuth tokens database table name
@@ -51,24 +50,31 @@ class TokenRepository implements TokenRepositoryInterface {
 	 * @param string $client_id Associated client ID
 	 * @param int    $user_id Associated user ID
 	 * @param string $scope Token scope permissions
+	 * @param string $resource Target resource URI (RFC 8707)
 	 * @param int    $expires_in Expiration time in seconds from now
 	 * @return bool True on success
 	 */
-	public function storeAccessToken( string $token, string $client_id, int $user_id, string $scope = 'read write', int $expires_in = 3600 ): bool {
+	public function storeAccessToken( string $token, string $client_id, int $user_id, string $scope = 'read write', string $resource = '', int $expires_in = 3600 ): bool {
 		global $wpdb;
 
-		$result = $wpdb->insert(
-			$this->table_name,
-			array(
-				'token_type'  => 'access',
-				'token_value' => $token,
-				'client_id'   => $client_id,
-				'user_id'     => $user_id,
-				'scope'       => $scope,
-				'expires_at'  => gmdate( 'Y-m-d H:i:s', time() + $expires_in ),
-				'token_version' => '2.0',
-			)
+		$table = $this->table_name;
+
+		$data = array(
+			'token_type'    => 'access',
+			'token_value'   => $token,
+			'client_id'     => $client_id,
+			'user_id'       => $user_id,
+			'scope'         => $scope,
+			'expires_at'    => date( 'Y-m-d H:i:s', strtotime( current_time( 'mysql' ) ) + $expires_in ),
+			'token_version' => '2.0',
 		);
+
+		// Add resource if provided (for MCP compliance - RFC 8707)
+		if ( ! empty( $resource ) ) {
+			$data['resource'] = $resource;
+		}
+
+		$result = $wpdb->insert( $table, $data );
 
 		return false !== $result;
 	}
@@ -83,24 +89,29 @@ class TokenRepository implements TokenRepositoryInterface {
 	 * @param string $client_id Associated client ID
 	 * @param int    $user_id Associated user ID
 	 * @param string $scope Token scope permissions
+	 * @param string $resource Target resource URI (RFC 8707)
 	 * @param int    $expires_in Expiration time in seconds from now
 	 * @return bool True on success
 	 */
-	public function storeRefreshToken( string $token, string $client_id, int $user_id, string $scope = 'read write', int $expires_in = 2592000 ): bool {
+	public function storeRefreshToken( string $token, string $client_id, int $user_id, string $scope = 'read write', string $resource = '', int $expires_in = 2592000 ): bool {
 		global $wpdb;
 
-		$result = $wpdb->insert(
-			$this->table_name,
-			array(
-				'token_type'  => 'refresh',
-				'token_value' => $token,
-				'client_id'   => $client_id,
-				'user_id'     => $user_id,
-				'scope'       => $scope,
-				'expires_at'  => gmdate( 'Y-m-d H:i:s', time() + $expires_in ),
-				'token_version' => '2.0',
-			)
+		$data = array(
+			'token_type'    => 'refresh',
+			'token_value'   => $token,
+			'client_id'     => $client_id,
+			'user_id'       => $user_id,
+			'scope'         => $scope,
+			'expires_at'    => date( 'Y-m-d H:i:s', strtotime( current_time( 'mysql' ) ) + $expires_in ),
+			'token_version' => '2.0',
 		);
+
+		// Add resource if provided (for MCP compliance - RFC 8707)
+		if ( ! empty( $resource ) ) {
+			$data['resource'] = $resource;
+		}
+
+		$result = $wpdb->insert( $this->table_name, $data );
 
 		return false !== $result;
 	}
@@ -113,25 +124,30 @@ class TokenRepository implements TokenRepositoryInterface {
 	 * @param int    $user_id User ID
 	 * @param string $code_challenge PKCE challenge
 	 * @param string $scope Requested scope
+	 * @param string $resource Target resource URI (RFC 8707)
 	 * @param int    $expires_in Expiration time in seconds
 	 * @return bool True on success
 	 */
-	public function storeAuthCode( string $code, string $client_id, int $user_id, string $code_challenge, string $scope = 'read write', int $expires_in = 300 ): bool {
+	public function storeAuthCode( string $code, string $client_id, int $user_id, string $code_challenge, string $scope = 'read write', string $resource = '', int $expires_in = 300 ): bool {
 		global $wpdb;
 
-		$result = $wpdb->insert(
-			$this->table_name,
-			array(
-				'token_type'     => 'code',
-				'token_value'    => $code,
-				'client_id'      => $client_id,
-				'user_id'        => $user_id,
-				'code_challenge' => $code_challenge,
-				'scope'          => $scope,
-				'expires_at'     => gmdate( 'Y-m-d H:i:s', time() + $expires_in ),
-				'token_version'  => '2.0',
-			)
+		$data = array(
+			'token_type'     => 'code',
+			'token_value'    => $code,
+			'client_id'      => $client_id,
+			'user_id'        => $user_id,
+			'code_challenge' => $code_challenge,
+			'scope'          => $scope,
+			'expires_at'     => date( 'Y-m-d H:i:s', strtotime( current_time( 'mysql' ) ) + $expires_in ),
+			'token_version'  => '2.0',
 		);
+
+		// Add resource if provided (for MCP compliance - RFC 8707)
+		if ( ! empty( $resource ) ) {
+			$data['resource'] = $resource;
+		}
+
+		$result = $wpdb->insert( $this->table_name, $data );
 
 		return false !== $result;
 	}
@@ -139,27 +155,46 @@ class TokenRepository implements TokenRepositoryInterface {
 	/**
 	 * Validate access token
 	 *
+	 * Validates an access token and optionally checks if it's bound to a specific resource.
+	 * This implements token audience binding per RFC 8707 (Resource Indicators).
+	 *
 	 * @param string $token Access token
+	 * @param string $expected_resource Expected resource URI (for audience validation)
 	 * @return object|null Token data or null if invalid
 	 */
-	public function validateAccessToken( string $token ): ?object {
+	public function validateAccessToken( string $token, string $expected_resource = '' ): ?object {
 		global $wpdb;
 
 		// Get all active access tokens to prevent timing attacks
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$table = esc_sql( $this->table_name );
 		$tokens = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT user_id, client_id, token_value, scope FROM %i 
+				"SELECT user_id, client_id, token_value, scope, resource FROM {$table} 
 				WHERE token_type = 'access' 
 				AND expires_at > %s",
-				$this->table_name,
-				gmdate( 'Y-m-d H:i:s' )
+				current_time( 'mysql' )
 			)
 		);
 
 		// Use timing-safe comparison to find matching token
 		foreach ( $tokens as $stored_token ) {
 			if ( SecurityUtils::validateToken( $token, $stored_token->token_value ) ) {
+				// If resource is specified, validate token audience matches (RFC 8707)
+				if ( ! empty( $expected_resource ) && ! empty( $stored_token->resource ) ) {
+					if ( $stored_token->resource !== $expected_resource ) {
+						// Token not valid for this resource - prevent token misuse
+						if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+							error_log( sprintf(
+								'[OAuth Passport] Token audience mismatch - Expected: "%s", Token: "%s"',
+								$expected_resource,
+								$stored_token->resource
+							) );
+						}
+						return null;
+					}
+				}
+
 				return $stored_token;
 			}
 		}
@@ -176,16 +211,17 @@ class TokenRepository implements TokenRepositoryInterface {
 	public function getAuthCode( string $code ): ?object {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		return $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT * FROM %i 
+				"SELECT * FROM {$table} 
 				WHERE token_type = 'code' 
 				AND token_value = %s 
 				AND expires_at > %s",
-				$this->table_name,
 				$code,
-				gmdate( 'Y-m-d H:i:s' )
+				current_time( 'mysql' )
 			)
 		);
 	}
@@ -199,16 +235,17 @@ class TokenRepository implements TokenRepositoryInterface {
 	public function getRefreshToken( string $token ): ?object {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		return $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT * FROM %i 
+				"SELECT * FROM {$table} 
 				WHERE token_type = 'refresh' 
 				AND token_value = %s 
 				AND expires_at > %s",
-				$this->table_name,
 				$token,
-				gmdate( 'Y-m-d H:i:s' )
+				current_time( 'mysql' )
 			)
 		);
 	}
@@ -255,12 +292,13 @@ class TokenRepository implements TokenRepositoryInterface {
 	public function cleanupExpiredTokens(): int {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
-				'DELETE FROM %i WHERE expires_at < %s',
-				$this->table_name,
-				gmdate( 'Y-m-d H:i:s' )
+				"DELETE FROM {$table} WHERE expires_at < %s",
+				current_time( 'mysql' )
 			)
 		);
 
@@ -275,11 +313,12 @@ class TokenRepository implements TokenRepositoryInterface {
 	 * @param int    $user_id User ID
 	 * @param string $code_challenge PKCE challenge
 	 * @param string $scope Requested scope
+	 * @param string $resource Target resource URI (RFC 8707)
 	 * @param int    $expires_in Expiration time in seconds
 	 * @return bool True on success
 	 */
-	public function storeAuthorizationCode( string $code, string $client_id, int $user_id, string $code_challenge, string $scope = 'read write', int $expires_in = 300 ): bool {
-		return $this->storeAuthCode( $code, $client_id, $user_id, $code_challenge, $scope, $expires_in );
+	public function storeAuthorizationCode( string $code, string $client_id, int $user_id, string $code_challenge, string $scope = 'read write', string $resource = '', int $expires_in = 300 ): bool {
+		return $this->storeAuthCode( $code, $client_id, $user_id, $code_challenge, $scope, $resource, $expires_in );
 	}
 
 	/**
@@ -342,12 +381,13 @@ class TokenRepository implements TokenRepositoryInterface {
 	public function getTokenStatistics(): array {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$stats = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT token_type, COUNT(*) as count FROM %i WHERE expires_at > %s GROUP BY token_type",
-				$this->table_name,
-				gmdate( 'Y-m-d H:i:s' )
+				"SELECT token_type, COUNT(*) as count FROM {$table} WHERE expires_at > %s GROUP BY token_type",
+				current_time( 'mysql' )
 			),
 			ARRAY_A
 		);
@@ -408,13 +448,14 @@ class TokenRepository implements TokenRepositoryInterface {
 	public function getUserTokens( int $user_id ): array {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$tokens = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM %i WHERE user_id = %d AND expires_at > %s",
-				$this->table_name,
+				"SELECT * FROM {$table} WHERE user_id = %d AND expires_at > %s",
 				$user_id,
-				gmdate( 'Y-m-d H:i:s' )
+				current_time( 'mysql' )
 			),
 			ARRAY_A
 		);
@@ -432,12 +473,12 @@ class TokenRepository implements TokenRepositoryInterface {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$table = esc_sql( $this->table_name );
 		$tokens = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM %i WHERE client_id = %s AND expires_at > %s",
-				$this->table_name,
+				"SELECT * FROM {$table} WHERE client_id = %s AND expires_at > %s",
 				$client_id,
-				gmdate( 'Y-m-d H:i:s' )
+				current_time( 'mysql' )
 			),
 			ARRAY_A
 		);

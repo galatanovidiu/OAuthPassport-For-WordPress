@@ -13,10 +13,10 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Services;
 
-use OAuthPassport\Contracts\TokenGeneratorInterface;
-use OAuthPassport\Contracts\TokenRepositoryInterface;
-use OAuthPassport\Contracts\ClientRepositoryInterface;
-use OAuthPassport\Contracts\ClientSecretManagerInterface;
+use OAuthPassport\Auth\SecureTokenGenerator;
+use OAuthPassport\Repositories\TokenRepository;
+use OAuthPassport\Repositories\ClientRepository;
+use OAuthPassport\Auth\ClientSecretManager;
 
 /**
  * Class TokenService
@@ -29,63 +29,103 @@ class TokenService {
 	/**
 	 * Token generator
 	 *
-	 * @var TokenGeneratorInterface
+	 * @var SecureTokenGenerator
 	 */
-	private TokenGeneratorInterface $token_generator;
+	private SecureTokenGenerator $token_generator;
 
 	/**
 	 * Token repository
 	 *
-	 * @var TokenRepositoryInterface
+	 * @var TokenRepository
 	 */
-	private TokenRepositoryInterface $token_repository;
+	private TokenRepository $token_repository;
 
 	/**
 	 * Client repository
 	 *
-	 * @var ClientRepositoryInterface
+	 * @var ClientRepository
 	 */
-	private ClientRepositoryInterface $client_repository;
+	private ClientRepository $client_repository;
 
 	/**
 	 * Client secret manager
 	 *
-	 * @var ClientSecretManagerInterface
+	 * @var ClientSecretManager
 	 */
-	private ClientSecretManagerInterface $secret_manager;
+	private ClientSecretManager $secret_manager;
 
 	/**
 	 * Initialize token service
 	 *
-	 * @param TokenGeneratorInterface      $token_generator Service for generating new tokens
-	 * @param TokenRepositoryInterface     $token_repository Repository for token storage and retrieval
-	 * @param ClientRepositoryInterface    $client_repository Repository for client validation
-	 * @param ClientSecretManagerInterface $secret_manager Service for client secret verification
-	 */
-	public function __construct(
-		TokenGeneratorInterface $token_generator,
-		TokenRepositoryInterface $token_repository,
-		ClientRepositoryInterface $client_repository,
-		ClientSecretManagerInterface $secret_manager
-	) {
-		$this->token_generator = $token_generator;
-		$this->token_repository = $token_repository;
-		$this->client_repository = $client_repository;
-		$this->secret_manager = $secret_manager;
+     * @param SecureTokenGenerator $token_generator Service for generating new tokens
+     * @param TokenRepository      $token_repository Repository for token storage and retrieval
+     * @param ClientRepository     $client_repository Repository for client validation
+     * @param ClientSecretManager  $secret_manager Service for client secret verification
+     */
+    public function __construct(
+        SecureTokenGenerator $token_generator,
+        TokenRepository $token_repository,
+        ClientRepository $client_repository,
+        ClientSecretManager $secret_manager
+    ) {
+        $this->token_generator = $token_generator;
+        $this->token_repository = $token_repository;
+        $this->client_repository = $client_repository;
+        $this->secret_manager = $secret_manager;
 	}
 
-	/**
-	 * Validate access token
-	 *
-	 * Validates an OAuth access token and returns associated data
-	 * if the token is valid and not expired.
-	 *
-	 * @param string $token Access token to validate
-	 * @return object|null Token data or null if invalid/expired
-	 */
-	public function validateAccessToken( string $token ): ?object {
-		return $this->token_repository->validateAccessToken( $token );
-	}
+    /**
+     * Validate access token
+     *
+     * Validates an OAuth access token and returns associated data
+     * if the token is valid and not expired.
+     *
+     * @param string $token Access token to validate
+     * @return object|null Token data or null if invalid/expired
+     */
+    public function validateAccessToken( string $token ): ?object {
+        return $this->token_repository->validateAccessToken( $token );
+    }
+
+    /**
+     * Issue new token pair for a client and user.
+     *
+     * @param string $client_id Client identifier.
+     * @param int    $user_id   WordPress user ID.
+     * @param string $scope     Space separated scope string.
+     * @param string $resource  Target resource URI (RFC 8707).
+     *
+     * @return array<string, string|int> Token payload suitable for API responses.
+     */
+    public function issueTokens( string $client_id, int $user_id, string $scope = 'read', string $resource = '' ): array {
+        $client = $this->client_repository->getClient( $client_id );
+        if ( ! $client ) {
+            throw new \InvalidArgumentException( 'Unknown client.' );
+        }
+
+        $normalized_scope = trim( $scope ) !== '' ? $scope : 'read';
+
+        $access_token  = $this->token_generator->generateAccessToken();
+        $refresh_token = $this->token_generator->generateRefreshToken();
+
+        $this->token_repository->storeAccessToken( $access_token, $client_id, $user_id, $normalized_scope, $resource );
+        $this->token_repository->storeRefreshToken( $refresh_token, $client_id, $user_id, $normalized_scope, $resource );
+
+        $response = array(
+            'access_token'  => $access_token,
+            'refresh_token' => $refresh_token,
+            'token_type'    => 'Bearer',
+            'expires_in'    => 3600,
+            'scope'         => $normalized_scope,
+        );
+
+        // Include resource in response if present (RFC 8707)
+        if ( ! empty( $resource ) ) {
+            $response['resource'] = $resource;
+        }
+
+        return $response;
+    }
 
 	/**
 	 * Refresh access token
@@ -121,19 +161,24 @@ class TokenService {
 		$new_access_token = $this->token_generator->generateAccessToken();
 		$new_refresh_token = $this->token_generator->generateRefreshToken();
 
-		// Store new tokens
+		// Preserve resource binding from refresh token (RFC 8707)
+		$resource = $token_data->resource ?? '';
+
+		// Store new tokens with preserved resource binding
 		$access_success = $this->token_repository->storeAccessToken(
 			$new_access_token,
 			$token_data->client_id,
 			(int) $token_data->user_id,
-			$token_data->scope ?? 'read write'
+			$token_data->scope ?? 'read write',
+			$resource
 		);
 
 		$refresh_success = $this->token_repository->storeRefreshToken(
 			$new_refresh_token,
 			$token_data->client_id,
 			(int) $token_data->user_id,
-			$token_data->scope ?? 'read write'
+			$token_data->scope ?? 'read write',
+			$resource
 		);
 
 		if ( ! $access_success || ! $refresh_success ) {
@@ -143,13 +188,20 @@ class TokenService {
 		// Delete old refresh token (token rotation)
 		$this->token_repository->deleteTokenById( (int) $token_data->id );
 
-		return array(
+		$response = array(
 			'access_token'  => $new_access_token,
 			'refresh_token' => $new_refresh_token,
 			'token_type'    => 'Bearer',
 			'expires_in'    => 3600,
 			'scope'         => $token_data->scope ?? 'read write',
 		);
+
+		// Include resource in response if present (RFC 8707)
+		if ( ! empty( $resource ) ) {
+			$response['resource'] = $resource;
+		}
+
+		return $response;
 	}
 
 	/**

@@ -13,18 +13,18 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Auth;
 
-use OAuthPassport\OAuthPassport;
-
 /**
  * Class DiscoveryServer
  *
  * Handles OAuth discovery endpoints for automatic client configuration.
  */
 class DiscoveryServer {
+	private ScopeManager $scope_manager;
 	/**
 	 * Initialize discovery server
 	 */
-	public function __construct() {
+	public function __construct( ScopeManager $scope_manager ) {
+		$this->scope_manager = $scope_manager;
 		// Hook into parse_request to handle .well-known paths.
 		add_action( 'parse_request', array( $this, 'handle_well_known_requests' ) );
 
@@ -101,8 +101,7 @@ class DiscoveryServer {
 			'authorization_endpoint'                => rest_url( 'oauth-passport/v1/authorize' ),
 			'token_endpoint'                        => rest_url( 'oauth-passport/v1/token' ),
 			'registration_endpoint'                 => rest_url( 'oauth-passport/v1/register' ),
-			'jwks_uri'                              => rest_url( 'oauth-passport/v1/jwks' ),
-			'scopes_supported'                      => array_keys( OAuthPassport::getAvailableScopes() ),
+			'scopes_supported'                      => array_keys( $this->scope_manager->getAvailableScopes() ),
 			'response_types_supported'              => array( 'code' ),
 			'grant_types_supported'                 => array( 'authorization_code', 'refresh_token' ),
 			'token_endpoint_auth_methods_supported' => array( 'client_secret_post', 'client_secret_basic' ),
@@ -125,9 +124,8 @@ class DiscoveryServer {
 		$metadata = array(
 			'resource'                 => $base_url,
 			'authorization_servers'    => array( $base_url ),
-			'scopes_supported'         => array_keys( OAuthPassport::getAvailableScopes() ),
+			'scopes_supported'         => array_keys( $this->scope_manager->getAvailableScopes() ),
 			'bearer_methods_supported' => array( 'header' ),
-			'jwks_uri'                 => rest_url( 'oauth-passport/v1/jwks' ),
 		);
 
 		// Allow filtering of metadata.
@@ -151,8 +149,7 @@ class DiscoveryServer {
 			'authorization_endpoint'                => rest_url( 'oauth-passport/v1/authorize' ),
 			'token_endpoint'                        => rest_url( 'oauth-passport/v1/token' ),
 			'registration_endpoint'                 => rest_url( 'oauth-passport/v1/register' ),
-			'jwks_uri'                              => rest_url( 'oauth-passport/v1/jwks' ),
-			'scopes_supported'                      => array_keys( OAuthPassport::getAvailableScopes() ),
+			'scopes_supported'                      => array_keys( $this->scope_manager->getAvailableScopes() ),
 			'response_types_supported'              => array( 'code' ),
 			'grant_types_supported'                 => array( 'authorization_code', 'refresh_token' ),
 			'token_endpoint_auth_methods_supported' => array( 'client_secret_post', 'client_secret_basic' ),
@@ -169,12 +166,13 @@ class DiscoveryServer {
 	 * @param array $data Response data.
 	 */
 	private function send_json_response( array $data ): void {
-		// Set CORS headers for discovery endpoints.
+		// Set CORS headers for discovery endpoints (MCP + OAuth compatibility).
 		header( 'Access-Control-Allow-Origin: *' );
-		header( 'Access-Control-Allow-Methods: GET, OPTIONS' );
-		header( 'Access-Control-Allow-Headers: Content-Type' );
+		header( 'Access-Control-Allow-Methods: GET, POST, OPTIONS' );
+		header( 'Access-Control-Allow-Headers: Content-Type, Authorization, mcp-protocol-version' );
+		header( 'Access-Control-Max-Age: 86400' ); // Cache preflight for 24 hours
 
-		// Handle OPTIONS request.
+		// Handle OPTIONS request (CORS preflight).
 		if ( isset( $_SERVER['REQUEST_METHOD'] ) && 'OPTIONS' === $_SERVER['REQUEST_METHOD'] ) {
 			http_response_code( 204 );
 			exit;

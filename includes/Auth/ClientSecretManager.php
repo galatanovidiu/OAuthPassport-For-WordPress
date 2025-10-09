@@ -13,15 +13,13 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Auth;
 
-use OAuthPassport\Contracts\ClientSecretManagerInterface;
-
 /**
  * Class ClientSecretManager
  *
  * Handles OAuth client secret hashing and verification using modern algorithms.
  * Supports Argon2id, Argon2i, and bcrypt with automatic migration from legacy formats.
  */
-class ClientSecretManager implements ClientSecretManagerInterface {
+class ClientSecretManager {
 
 	/**
 	 * Default Argon2id hashing parameters

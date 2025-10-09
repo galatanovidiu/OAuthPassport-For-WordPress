@@ -13,15 +13,13 @@ declare( strict_types=1 );
 
 namespace OAuthPassport\Repositories;
 
-use OAuthPassport\Contracts\ClientRepositoryInterface;
-
 /**
  * Class ClientRepository
  *
  * WordPress database implementation for OAuth client storage and retrieval
  * with JSON field handling and backward compatibility support.
  */
-class ClientRepository implements ClientRepositoryInterface {
+class ClientRepository {
 
 	/**
 	 * OAuth clients database table name
@@ -53,11 +51,12 @@ class ClientRepository implements ClientRepositoryInterface {
 		global $wpdb;
 
 		// First check database for dynamically registered clients
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$db_client = $wpdb->get_row(
 			$wpdb->prepare(
-				'SELECT * FROM %i WHERE client_id = %s',
-				$this->table_name,
+				"SELECT * FROM {$table} WHERE client_id = %s",
 				$client_id
 			),
 			ARRAY_A
@@ -76,6 +75,9 @@ class ClientRepository implements ClientRepositoryInterface {
 			}
 			if ( ! empty( $db_client['contacts'] ) ) {
 				$db_client['contacts'] = json_decode( $db_client['contacts'], true );
+			}
+			if ( ! empty( $db_client['allowed_resources'] ) ) {
+				$db_client['allowed_resources'] = json_decode( $db_client['allowed_resources'], true );
 			}
 			
 			return $db_client;
@@ -108,7 +110,7 @@ class ClientRepository implements ClientRepositoryInterface {
 		$db_data = $client_data;
 
 		// Convert arrays to JSON for storage
-		$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts' );
+		$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts', 'allowed_resources' );
 		foreach ( $json_fields as $field ) {
 			if ( isset( $db_data[ $field ] ) && is_array( $db_data[ $field ] ) ) {
 				$db_data[ $field ] = wp_json_encode( $db_data[ $field ] );
@@ -137,7 +139,7 @@ class ClientRepository implements ClientRepositoryInterface {
 		$db_data = $update_data;
 
 		// Convert arrays to JSON for storage
-		$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts' );
+		$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts', 'allowed_resources' );
 		foreach ( $json_fields as $field ) {
 			if ( isset( $db_data[ $field ] ) && is_array( $db_data[ $field ] ) ) {
 				$db_data[ $field ] = wp_json_encode( $db_data[ $field ] );
@@ -180,11 +182,12 @@ class ClientRepository implements ClientRepositoryInterface {
 	public function getAllClients( int $limit = 100, int $offset = 0 ): array {
 		global $wpdb;
 
+		$table = esc_sql( $this->table_name );
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$clients = $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT * FROM %i ORDER BY created_at DESC LIMIT %d OFFSET %d',
-				$this->table_name,
+				"SELECT * FROM {$table} ORDER BY created_at DESC LIMIT %d OFFSET %d",
 				$limit,
 				$offset
 			),
@@ -197,7 +200,7 @@ class ClientRepository implements ClientRepositoryInterface {
 
 		// Convert JSON fields back to arrays
 		foreach ( $clients as &$client ) {
-			$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts' );
+			$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts', 'allowed_resources' );
 			foreach ( $json_fields as $field ) {
 				if ( ! empty( $client[ $field ] ) ) {
 					$decoded = json_decode( $client[ $field ], true );

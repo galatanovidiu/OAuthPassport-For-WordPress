@@ -55,19 +55,25 @@ curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
 ## API Endpoints
 
 ### OAuth Endpoints
-- `POST /wp-json/oauth-passport/v1/register` - Client registration
-- `GET/POST /wp-json/oauth-passport/v1/authorize` - Authorization
+- `POST /wp-json/oauth-passport/v1/register` - Client registration (RFC 7591)
+- `GET /wp-json/oauth-passport/v1/register/{client_id}` - Get client configuration
+- `PUT /wp-json/oauth-passport/v1/register/{client_id}` - Update client configuration
+- `DELETE /wp-json/oauth-passport/v1/register/{client_id}` - Delete client
+- `GET/POST /wp-json/oauth-passport/v1/authorize` - Authorization endpoint
 - `POST /wp-json/oauth-passport/v1/token` - Token exchange/refresh
-- `GET /wp-json/oauth-passport/v1/jwks` - JSON Web Key Set
 
 ### Discovery Endpoints
 - `GET /.well-known/oauth-authorization-server` - Server metadata (RFC 8414)
 - `GET /.well-known/oauth-protected-resource` - Resource metadata (RFC 9728)
 
 ### Admin Endpoints
-- `GET /wp-json/oauth-passport/v1/admin/clients` - List clients
-- `GET /wp-json/oauth-passport/v1/admin/tokens` - List tokens
-- `DELETE /wp-json/oauth-passport/v1/admin/tokens/{id}` - Revoke token
+- `GET /wp-json/oauth-passport/v1/admin/clients` - List all clients
+- `DELETE /wp-json/oauth-passport/v1/admin/clients/{client_id}` - Delete client
+- `DELETE /wp-json/oauth-passport/v1/admin/clients/{client_id}/tokens` - Revoke all client tokens
+- `GET /wp-json/oauth-passport/v1/admin/tokens` - List active tokens
+- `DELETE /wp-json/oauth-passport/v1/admin/tokens/{token_id}` - Revoke specific token
+- `POST /wp-json/oauth-passport/v1/admin/tokens/generate` - Generate tokens (admin only)
+- `GET /wp-json/oauth-passport/v1/admin/endpoints` - List all available endpoints
 
 ## OAuth Scopes
 
@@ -119,42 +125,56 @@ Authorization: Bearer {registration_access_token}
 ### Admin Interface
 
 Access OAuth management at **Settings > OAuth Passport**:
-- Configure token lifetimes and security settings
 - View and manage registered clients
 - Monitor active tokens and revoke access
-- View OAuth event logs
+- Generate tokens for testing
+- View endpoint information
 
-### Helper Functions
+### Runtime Access
 
-Check current OAuth token:
+Access plugin services through the runtime:
+
 ```php
-$token = oauth_passport_get_current_token();
-if ($token) {
-    $scopes = explode(' ', $token->scope);
-    $client_id = $token->client_id;
-}
+// Get the runtime instance
+$runtime = \OAuthPassport\oauth_passport_runtime();
+
+// Access services
+$scope_manager = $runtime->scopeManager();
+$token_service = $runtime->tokenService();
+$client_service = $runtime->clientService();
+$token_repository = $runtime->tokenRepository();
+$client_repository = $runtime->clientRepository();
+
+// Example: Validate scopes
+$valid_scopes = $scope_manager->validate(['read', 'write']);
+
+// Example: Check user can access scope
+$can_access = $scope_manager->userCanAccessScope($user_id, 'admin');
 ```
 
-Check user permissions:
-```php
-if (oauth_passport_user_can('read')) {
-    // User has read access
-}
+### WP-CLI Commands
 
-if (oauth_passport_user_has_scope('write')) {
-    // OAuth token has write scope
-}
+Generate tokens from command line:
+
+```bash
+wp oauth-passport generate-tokens <user_id> \
+  --client_id=<client_id> \
+  --scope="read write"
 ```
 
 ### Protect Custom Endpoints
+
+OAuth Passport integrates with WordPress's REST API authentication:
 
 ```php
 add_action('rest_api_init', function() {
     register_rest_route('myapp/v1', '/data', [
         'methods' => 'GET',
-        'callback' => 'my_endpoint',
+        'callback' => 'my_endpoint_callback',
         'permission_callback' => function() {
-            return oauth_passport_user_can('read');
+            // WordPress automatically authenticates OAuth tokens
+            // Just use standard WordPress capability checks
+            return current_user_can('read');
         }
     ]);
 });
@@ -193,13 +213,18 @@ add_filter('oauth_passport_allow_localhost', '__return_true');
 ### Tables Created
 - `wp_oauth_passport_tokens` - Stores all token types (access, refresh, authorization codes)
 - `wp_oauth_passport_clients` - Registered OAuth clients
-- `wp_oauth_passport_logs` - OAuth events and errors
 
 ### Token Types
-- `code` - Authorization codes (5 minutes)
-- `access` - Access tokens (1 hour default)
-- `refresh` - Refresh tokens (30 days default)
-- `registration` - Registration access tokens (no expiration)
+- `code` - Authorization codes (5 minutes expiration)
+- `access` - Access tokens (1 hour default, configurable)
+- `refresh` - Refresh tokens (30 days default, configurable)
+- `registration` - Registration access tokens (never expire)
+
+### Key Features
+- **Opaque tokens** - Random strings stored in database (not JWT)
+- **Resource indicators** - Support for RFC 8707 resource parameter
+- **Token versioning** - Schema version tracking for migrations
+- **Automatic cleanup** - Expired tokens can be cleaned via cron
 
 ## Security Features
 
@@ -212,13 +237,170 @@ add_filter('oauth_passport_allow_localhost', '__return_true');
 
 ## Standards Compliance
 
-- RFC 6749 (OAuth 2.0)
-- RFC 7636 (PKCE)
-- RFC 7591 (Dynamic Client Registration)
-- RFC 7592 (Client Configuration)
-- RFC 8414 (Authorization Server Metadata)
-- RFC 9728 (Protected Resource Metadata)
-- OAuth 2.1 Draft Specification
+- **RFC 6749** - OAuth 2.0 Authorization Framework
+- **RFC 7636** - PKCE (Proof Key for Code Exchange) - **Mandatory**
+- **RFC 7591** - Dynamic Client Registration Protocol
+- **RFC 7592** - Dynamic Client Management Protocol
+- **RFC 8414** - Authorization Server Metadata
+- **RFC 8707** - Resource Indicators for OAuth 2.0
+- **RFC 9728** - OAuth 2.0 Protected Resource Metadata
+- **OAuth 2.1** - Draft Specification (consolidated best practices)
+- **MCP** - Model Context Protocol Authorization Support
+
+### OAuth 2.1 Compliance
+
+OAuth Passport follows OAuth 2.1 requirements:
+- ✅ PKCE mandatory for all authorization code flows
+- ✅ No implicit grant (removed in 2.1)
+- ✅ No resource owner password credentials grant
+- ✅ Refresh token rotation supported
+- ✅ Redirect URI exact matching
+
+## Resource Indicators (RFC 8707)
+
+OAuth Passport supports RFC 8707 Resource Indicators, allowing clients to specify which resource server they want to access with the token.
+
+### How It Works
+
+Clients can include a `resource` parameter in authorization and token requests:
+
+```bash
+# Authorization request with resource
+GET /oauth-passport/v1/authorize?
+  client_id=CLIENT_ID&
+  redirect_uri=REDIRECT_URI&
+  response_type=code&
+  code_challenge=CHALLENGE&
+  code_challenge_method=S256&
+  resource=https://api.example.com
+```
+
+```bash
+# Token request with resource
+POST /oauth-passport/v1/token
+  grant_type=authorization_code&
+  code=AUTH_CODE&
+  client_id=CLIENT_ID&
+  client_secret=CLIENT_SECRET&
+  code_verifier=VERIFIER&
+  resource=https://api.example.com
+```
+
+### Benefits
+
+- **Token scoping** - Tokens are bound to specific resource servers
+- **Security** - Prevents token misuse across different services
+- **MCP support** - Required for Model Context Protocol authorization
+- **Multi-service** - Support multiple resource servers with different tokens
+
+### Client Configuration
+
+Clients can register allowed resources during registration:
+
+```json
+{
+  "client_name": "My App",
+  "redirect_uris": ["https://app.example.com/callback"],
+  "allowed_resources": [
+    "https://api.example.com",
+    "https://mcp.example.com/server"
+  ]
+}
+```
+
+When `allowed_resources` is configured, the authorization server will validate that requested resources are in the allowed list.
+
+## Plugin Architecture
+
+### Runtime Container
+
+OAuth Passport uses a lightweight Runtime container for dependency management:
+
+```php
+// Access the runtime
+$runtime = \OAuthPassport\oauth_passport_runtime();
+
+// Available services
+$runtime->scopeManager()          // ScopeManager instance
+$runtime->tokenService()          // TokenService instance
+$runtime->authorizationService()  // AuthorizationService instance
+$runtime->clientService()         // ClientService instance
+$runtime->clientRepository()      // ClientRepository instance
+$runtime->tokenRepository()       // TokenRepository instance
+$runtime->tokenGenerator()        // SecureTokenGenerator instance
+$runtime->secretManager()         // ClientSecretManager instance
+```
+
+### Service Architecture
+
+**Services** (Business Logic):
+- `AuthorizationService` - Handles authorization code flow
+- `TokenService` - Issues and validates tokens
+- `ClientService` - Manages client registration and configuration
+
+**Repositories** (Data Access):
+- `ClientRepository` - Client CRUD operations
+- `TokenRepository` - Token CRUD operations
+
+**Utilities**:
+- `ScopeManager` - Scope validation and user permission checks
+- `SecureTokenGenerator` - Cryptographically secure token generation
+- `ClientSecretManager` - Secret hashing and verification
+- `PKCEValidator` - PKCE challenge/verifier validation
+
+### Integration Points
+
+**WordPress Hooks**:
+- `plugins_loaded` - Initialize plugin services
+- `rest_api_init` - Register REST API endpoints
+- `parse_request` - Handle .well-known discovery endpoints
+- `determine_current_user` - Authenticate OAuth tokens
+
+**Filters**:
+- `oauth_passport_scopes` - Customize available scopes
+- `oauth_passport_authorization_server_metadata` - Modify discovery metadata
+- `oauth_passport_protected_resource_metadata` - Modify resource metadata
+- `oauth_passport_access_token_lifetime` - Customize token expiration
+- `oauth_passport_refresh_token_lifetime` - Customize refresh token expiration
+
+## Model Context Protocol (MCP) Support
+
+OAuth Passport fully supports MCP authorization requirements. See [../llm-docks/MCP_REQUIREMENTS.md](../llm-docks/MCP_REQUIREMENTS.md) for complete details.
+
+### Key MCP Features
+
+1. **Protected Resource Metadata** - RFC 9728 endpoint for MCP server discovery
+2. **Dynamic Client Registration** - RFC 7591 for automatic client setup
+3. **Resource Indicators** - RFC 8707 for per-server token scoping
+4. **PKCE Mandatory** - All flows require PKCE for security
+5. **CORS Support** - Discovery endpoints support CORS for browser clients
+
+### MCP Authorization Flow
+
+```bash
+# 1. Discover authorization server
+curl https://mcp-server.example.com/.well-known/oauth-protected-resource
+
+# 2. Register client dynamically
+curl -X POST https://auth-server.example.com/wp-json/oauth-passport/v1/register \
+  -H "Content-Type: application/json" \
+  -d '{"client_name": "MCP Client", "redirect_uris": ["https://client.example.com/callback"]}'
+
+# 3. Authorization with resource parameter
+GET /oauth-passport/v1/authorize?
+  client_id=CLIENT_ID&
+  resource=https://mcp-server.example.com&
+  code_challenge=CHALLENGE&
+  code_challenge_method=S256&
+  response_type=code
+
+# 4. Token request with resource
+POST /oauth-passport/v1/token
+  grant_type=authorization_code&
+  code=AUTH_CODE&
+  resource=https://mcp-server.example.com&
+  code_verifier=VERIFIER
+```
 
 ## Testing
 
