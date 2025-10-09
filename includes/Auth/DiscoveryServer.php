@@ -166,12 +166,13 @@ class DiscoveryServer {
 	 * @param array $data Response data.
 	 */
 	private function send_json_response( array $data ): void {
-		// Set CORS headers for discovery endpoints.
+		// Set CORS headers for discovery endpoints (MCP + OAuth compatibility).
 		header( 'Access-Control-Allow-Origin: *' );
-		header( 'Access-Control-Allow-Methods: GET, OPTIONS' );
-		header( 'Access-Control-Allow-Headers: Content-Type' );
+		header( 'Access-Control-Allow-Methods: GET, POST, OPTIONS' );
+		header( 'Access-Control-Allow-Headers: Content-Type, Authorization, mcp-protocol-version' );
+		header( 'Access-Control-Max-Age: 86400' ); // Cache preflight for 24 hours
 
-		// Handle OPTIONS request.
+		// Handle OPTIONS request (CORS preflight).
 		if ( isset( $_SERVER['REQUEST_METHOD'] ) && 'OPTIONS' === $_SERVER['REQUEST_METHOD'] ) {
 			http_response_code( 204 );
 			exit;

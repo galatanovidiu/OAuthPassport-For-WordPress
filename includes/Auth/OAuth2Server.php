@@ -163,14 +163,16 @@ class OAuth2Server {
 		add_action( 'init', array( $this, 'maybe_create_tables' ), 5 );
 
 		// Register REST routes only if not in test mode.
-		if ( ! defined( 'OAUTH_PASSPORT_TEST_MODE' ) || ! OAUTH_PASSPORT_TEST_MODE ) {
+		if ( ! defined( 'OAUTH_PASSPORT_TEST_MODE' ) || ! constant( 'OAUTH_PASSPORT_TEST_MODE' ) ) {
 			add_action( 'rest_api_init', array( $this, 'register_routes' ) );
+			add_filter( 'rest_pre_serve_request', array( $this, 'add_cors_headers' ), 10, 4 );
 		}
 
 		// Hook into authentication filters only if not in test mode.
-		if ( ! defined( 'OAUTH_PASSPORT_TEST_MODE' ) || ! OAUTH_PASSPORT_TEST_MODE ) {
+		if ( ! defined( 'OAUTH_PASSPORT_TEST_MODE' ) || ! constant( 'OAUTH_PASSPORT_TEST_MODE' ) ) {
 			add_filter( 'determine_current_user', array( $this, 'authenticate_oauth' ), 20 );
 			add_filter( 'rest_authentication_errors', array( $this, 'rest_authentication_errors' ), 20 );
+			add_filter( 'rest_post_dispatch', array( $this, 'add_www_authenticate_to_response' ), 10, 3 );
 		}
 
 		// Add admin-post handler for OAuth authorization form
@@ -689,6 +691,9 @@ class OAuth2Server {
 			if ( ! str_contains( $token, '.' ) ) {
 				// OAuth token was provided but user is not authenticated.
 				if ( ! is_user_logged_in() ) {
+					// Send WWW-Authenticate header for MCP discovery (RFC 9728)
+					$this->send_www_authenticate_header();
+					
 					return new WP_Error(
 						'oauth_invalid_token',
 						'The access token is invalid or expired',
@@ -828,12 +833,186 @@ class OAuth2Server {
 	}
 
 	/**
+	 * Validate resource parameter for REST API (RFC 8707)
+	 *
+	 * @param string          $value   The value submitted in the request.
+	 * @param WP_REST_Request $request The request object.
+	 * @param string          $param   The parameter name.
+	 * @return bool|WP_Error True if valid, WP_Error otherwise.
+	 */
+	public function validate_resource_param( $value, $request, $param ) {
+		// Empty resource is valid (optional parameter)
+		if ( empty( $value ) ) {
+			return true;
+		}
+
+		// Must not contain fragment
+		if ( strpos( $value, '#' ) !== false ) {
+			return new WP_Error(
+				'rest_invalid_param',
+				'Resource parameter must not contain fragment identifier',
+				array( 'status' => 400 )
+			);
+		}
+
+		$parsed = wp_parse_url( $value );
+
+		// Must have scheme and host
+		if ( empty( $parsed['scheme'] ) || empty( $parsed['host'] ) ) {
+			return new WP_Error(
+				'rest_invalid_param',
+				'Resource parameter must be a valid absolute URI',
+				array( 'status' => 400 )
+			);
+		}
+
+		// Scheme must be http or https
+		$scheme = strtolower( $parsed['scheme'] );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+			return new WP_Error(
+				'rest_invalid_param',
+				'Resource parameter must use http or https scheme',
+				array( 'status' => 400 )
+			);
+		}
+
+		return true;
+	}
+
+	/**
 	 * Check if OAuth server is enabled
 	 *
 	 * @return bool
 	 */
 	public function is_enabled(): bool {
 		return $this->enabled;
+	}
+
+	/**
+	 * Send WWW-Authenticate header for 401 responses (RFC 9728)
+	 *
+	 * Per RFC 9728 (Protected Resource Metadata), servers MUST include
+	 * WWW-Authenticate header in 401 responses to enable authorization
+	 * server discovery for MCP clients.
+	 *
+	 * @return void
+	 */
+	private function send_www_authenticate_header(): void {
+		// Only send if headers not already sent
+		if ( headers_sent() ) {
+			return;
+		}
+
+		$base_url = untrailingslashit( home_url() );
+		$metadata_url = $base_url . '/.well-known/oauth-protected-resource';
+		
+		// Format per RFC 6750 and RFC 9728
+		$header = sprintf(
+			'Bearer realm="%s", as_uri="%s"',
+			esc_attr( get_bloginfo( 'name' ) ),
+			esc_url( $metadata_url )
+		);
+		
+		header( 'WWW-Authenticate: ' . $header, false );
+	}
+
+	/**
+	 * Add CORS headers to OAuth Passport REST API responses
+	 *
+	 * Enables MCP clients and other cross-origin clients to access OAuth endpoints.
+	 * Only applies to oauth-passport namespace endpoints.
+	 *
+	 * @param bool              $served  Whether the request has already been served.
+	 * @param \WP_REST_Response $result  Result to send to the client.
+	 * @param \WP_REST_Request  $request Request used to generate the response.
+	 * @param \WP_REST_Server   $server  Server instance.
+	 * @return bool Whether the request was served.
+	 */
+	public function add_cors_headers( $served, $result, $request, $server ) {
+		// Only handle oauth-passport namespace
+		$route = $request->get_route();
+		if ( strpos( $route, '/oauth-passport/' ) !== 0 ) {
+			return $served;
+		}
+
+		// Add CORS headers for OAuth endpoints
+		if ( ! headers_sent() ) {
+			header( 'Access-Control-Allow-Origin: *' );
+			header( 'Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS' );
+			header( 'Access-Control-Allow-Headers: Content-Type, Authorization, mcp-protocol-version' );
+			header( 'Access-Control-Expose-Headers: WWW-Authenticate' );
+			header( 'Access-Control-Max-Age: 86400' );
+		}
+
+		// Handle OPTIONS preflight request
+		if ( 'OPTIONS' === $request->get_method() ) {
+			http_response_code( 204 );
+			exit;
+		}
+
+		return $served;
+	}
+
+	/**
+	 * Add WWW-Authenticate header to REST API 401 responses
+	 *
+	 * This filter ensures the WWW-Authenticate header is properly included
+	 * in REST API responses for MCP client discovery.
+	 *
+	 * @param \WP_REST_Response $response Response object.
+	 * @param \WP_REST_Server   $server   Server instance.
+	 * @param \WP_REST_Request  $request  Request object.
+	 * @return \WP_REST_Response Modified response.
+	 */
+	public function add_www_authenticate_to_response( $response, $server, $request ) {
+		// Only add header to 401 responses
+		if ( ! is_a( $response, 'WP_REST_Response' ) ) {
+			return $response;
+		}
+
+		$status = $response->get_status();
+		if ( 401 !== $status ) {
+			return $response;
+		}
+
+		// Check if this is an OAuth-related error
+		$data = $response->get_data();
+		$is_oauth_error = false;
+
+		if ( is_array( $data ) ) {
+			// Check for oauth error codes
+			$oauth_codes = array( 'oauth_invalid_token', 'rest_forbidden', 'rest_not_logged_in' );
+			if ( isset( $data['code'] ) && in_array( $data['code'], $oauth_codes, true ) ) {
+				$is_oauth_error = true;
+			}
+		} elseif ( is_wp_error( $data ) ) {
+			$code = $data->get_error_code();
+			if ( 'oauth_invalid_token' === $code || 'rest_forbidden' === $code ) {
+				$is_oauth_error = true;
+			}
+		}
+
+		// Also check if Bearer token was provided in request
+		$auth_header = $request->get_header( 'authorization' );
+		if ( ! empty( $auth_header ) && preg_match( '/Bearer\s+/i', $auth_header ) ) {
+			$is_oauth_error = true;
+		}
+
+		// Add WWW-Authenticate header for OAuth-related 401s
+		if ( $is_oauth_error ) {
+			$base_url = untrailingslashit( home_url() );
+			$metadata_url = $base_url . '/.well-known/oauth-protected-resource';
+			
+			$header = sprintf(
+				'Bearer realm="%s", as_uri="%s"',
+				esc_attr( get_bloginfo( 'name' ) ),
+				esc_url( $metadata_url )
+			);
+			
+			$response->header( 'WWW-Authenticate', $header );
+		}
+
+		return $response;
 	}
 
 	/**
@@ -857,94 +1036,18 @@ class OAuth2Server {
 	}
 
 	/**
-	 * Handle token revocation
-	 *
-	 * @param WP_REST_Request $request The request object.
-	 * @return WP_REST_Response|WP_Error
+	 * Format an OAuth-compliant error payload.
 	 */
-	public function handle_token_revocation( WP_REST_Request $request ) {
-		$params = $request->get_json_params();
-		if ( ! $params ) {
-			$params = $request->get_body_params();
-		}
-
-		$token = $params['token'] ?? '';
-		if ( empty( $token ) ) {
-			return new WP_Error(
-				'invalid_request',
-				'Missing token parameter',
-				array( 'status' => 400 )
-			);
-		}
-
-		// Revoke the token
-		$this->revoke_token( $token );
-
-		return rest_ensure_response( array( 'revoked' => true ) );
-	}
-
-	/**
-	 * Handle token introspection
-	 *
-	 * @param WP_REST_Request $request The request object.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function handle_token_introspection( WP_REST_Request $request ) {
-		$params = $request->get_json_params();
-		if ( ! $params ) {
-			$params = $request->get_body_params();
-		}
-
-		$token = $params['token'] ?? '';
-		if ( empty( $token ) ) {
-			return new WP_Error(
-				'invalid_request',
-				'Missing token parameter',
-				array( 'status' => 400 )
-			);
-		}
-
-		// Get token info
-		$token_info = $this->get_token_info( $token );
-		
-		if ( ! $token_info ) {
-			return rest_ensure_response( array( 'active' => false ) );
-		}
-
-		// Check if token is expired
-		$is_active = strtotime( $token_info->expires_at ) > time();
-
-		$response = array(
-			'active' => $is_active,
+	private function oauth_error( string $error, string $description, int $status ): WP_REST_Response {
+		$response = new WP_REST_Response(
+			array(
+				'error'             => $error,
+				'error_description' => $description,
+			)
 		);
+		$response->set_status( $status );
 
-		if ( $is_active ) {
-			$response['client_id'] = $token_info->client_id;
-			$response['scope'] = $token_info->scope;
-			$response['exp'] = strtotime( $token_info->expires_at );
-		}
-
-		return rest_ensure_response( $response );
-	}
-
-	/**
-	 * Handle discovery request
-	 *
-	 * @param WP_REST_Request $request The request object.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function handle_discovery_request( WP_REST_Request $request ) {
-		return $this->discovery_server->handle_request( $request );
-	}
-
-	/**
-	 * Handle JWKS request
-	 *
-	 * @param WP_REST_Request $request The request object.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function handle_jwks_request( WP_REST_Request $request ) {
-		return $this->jwks_server->handle_request( $request );
+		return $response;
 	}
 
 	/**
