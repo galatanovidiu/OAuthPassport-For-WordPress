@@ -174,11 +174,12 @@ curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
 
 ## Getting Help
 
-1. **Check error logs:** WordPress debug log and OAuth event logs in admin
+1. **Check error logs:** WordPress debug log (`wp-content/debug.log`)
 2. **Review database:** Verify tokens and clients exist
 3. **Test endpoints:** Use curl to test each endpoint individually
-4. **Check requirements:** PHP 8.0+, MySQL 5.7+, HTTPS (production)
+4. **Check requirements:** PHP 8.1+, MySQL 5.7+, HTTPS (production), Pretty permalinks
 5. **Browser console:** Look for JavaScript errors in admin interface
+6. **Admin endpoints list:** Visit `/wp-json/oauth-passport/v1/admin/endpoints` to see all available endpoints
 
 ## Useful Database Queries
 
