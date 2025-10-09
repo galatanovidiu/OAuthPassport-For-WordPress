@@ -76,6 +76,9 @@ class ClientRepository {
 			if ( ! empty( $db_client['contacts'] ) ) {
 				$db_client['contacts'] = json_decode( $db_client['contacts'], true );
 			}
+			if ( ! empty( $db_client['allowed_resources'] ) ) {
+				$db_client['allowed_resources'] = json_decode( $db_client['allowed_resources'], true );
+			}
 			
 			return $db_client;
 		}
@@ -107,7 +110,7 @@ class ClientRepository {
 		$db_data = $client_data;
 
 		// Convert arrays to JSON for storage
-		$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts' );
+		$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts', 'allowed_resources' );
 		foreach ( $json_fields as $field ) {
 			if ( isset( $db_data[ $field ] ) && is_array( $db_data[ $field ] ) ) {
 				$db_data[ $field ] = wp_json_encode( $db_data[ $field ] );
@@ -136,7 +139,7 @@ class ClientRepository {
 		$db_data = $update_data;
 
 		// Convert arrays to JSON for storage
-		$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts' );
+		$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts', 'allowed_resources' );
 		foreach ( $json_fields as $field ) {
 			if ( isset( $db_data[ $field ] ) && is_array( $db_data[ $field ] ) ) {
 				$db_data[ $field ] = wp_json_encode( $db_data[ $field ] );
@@ -197,7 +200,7 @@ class ClientRepository {
 
 		// Convert JSON fields back to arrays
 		foreach ( $clients as &$client ) {
-			$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts' );
+			$json_fields = array( 'redirect_uris', 'grant_types', 'response_types', 'contacts', 'allowed_resources' );
 			foreach ( $json_fields as $field ) {
 				if ( ! empty( $client[ $field ] ) ) {
 					$decoded = json_decode( $client[ $field ], true );

@@ -85,10 +85,11 @@ class AuthorizationService {
 	 * @param int    $user_id User ID granting authorization
 	 * @param string $code_challenge PKCE code challenge for security
 	 * @param string $scope Requested OAuth scopes
+	 * @param string $resource Target resource URI (RFC 8707)
 	 * @return string Generated authorization code
 	 * @throws \Exception If generation fails or client is invalid
 	 */
-	public function generateAuthorizationCode( string $client_id, int $user_id, string $code_challenge, string $scope ): string {
+	public function generateAuthorizationCode( string $client_id, int $user_id, string $code_challenge, string $scope, string $resource = '' ): string {
 		// Validate client exists
 		$client = $this->client_repository->getClient( $client_id );
 		if ( ! $client ) {
@@ -110,6 +111,7 @@ class AuthorizationService {
 			$user_id,
 			$code_challenge,
 			$final_scope,
+			$resource,
 			300
 		);
 
@@ -126,10 +128,11 @@ class AuthorizationService {
 	 * @param string $code Authorization code
 	 * @param string $client_id Client ID
 	 * @param string $code_verifier PKCE verifier
+	 * @param string $resource Resource parameter from token request (RFC 8707)
 	 * @return array Token data
 	 * @throws \Exception If validation fails
 	 */
-	public function exchangeAuthorizationCode( string $code, string $client_id, string $code_verifier ): array {
+	public function exchangeAuthorizationCode( string $code, string $client_id, string $code_verifier, string $resource = '' ): array {
 		// Get authorization code
 		$auth_code = $this->token_repository->getAuthCode( $code );
 		if ( ! $auth_code ) {
@@ -138,7 +141,27 @@ class AuthorizationService {
 
 		// Validate client matches
 		if ( $auth_code->client_id !== $client_id ) {
+			error_log( sprintf(
+				'[OAuth Passport] Client ID mismatch - Expected: "%s", Got: "%s"',
+				$auth_code->client_id,
+				$client_id
+			) );
 			throw new \InvalidArgumentException( 'Client ID mismatch' );
+		}
+
+		// Validate resource parameter matches authorization code (RFC 8707)
+		$auth_code_resource = $auth_code->resource ?? '';
+		if ( ! empty( $resource ) || ! empty( $auth_code_resource ) ) {
+			if ( $resource !== $auth_code_resource ) {
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log( sprintf(
+						'[OAuth Passport] Resource parameter mismatch - Auth code: "%s", Token request: "%s"',
+						$auth_code_resource,
+						$resource
+					) );
+				}
+				throw new \InvalidArgumentException( 'Resource parameter mismatch' );
+			}
 		}
 
 		// Validate PKCE
@@ -150,19 +173,21 @@ class AuthorizationService {
 		$access_token = $this->token_generator->generateAccessToken();
 		$refresh_token = $this->token_generator->generateRefreshToken();
 
-		// Store tokens
+		// Store tokens with resource binding
 		$access_success = $this->token_repository->storeAccessToken(
 			$access_token,
 			$auth_code->client_id,
 			(int) $auth_code->user_id,
-			$auth_code->scope ?? 'read write'
+			$auth_code->scope ?? 'read write',
+			$auth_code_resource
 		);
 
 		$refresh_success = $this->token_repository->storeRefreshToken(
 			$refresh_token,
 			$auth_code->client_id,
 			(int) $auth_code->user_id,
-			$auth_code->scope ?? 'read write'
+			$auth_code->scope ?? 'read write',
+			$auth_code_resource
 		);
 
 		if ( ! $access_success || ! $refresh_success ) {
@@ -172,13 +197,20 @@ class AuthorizationService {
 		// Delete used authorization code
 		$this->token_repository->deleteTokenById( (int) $auth_code->id );
 
-		return array(
+		$response = array(
 			'access_token'  => $access_token,
 			'refresh_token' => $refresh_token,
 			'token_type'    => 'Bearer',
 			'expires_in'    => 3600,
 			'scope'         => $auth_code->scope ?? 'read write',
 		);
+
+		// Include resource in response if present (RFC 8707)
+		if ( ! empty( $auth_code_resource ) ) {
+			$response['resource'] = $auth_code_resource;
+		}
+
+		return $response;
 	}
 
 	/**
@@ -252,9 +284,10 @@ class AuthorizationService {
 		$scope = $params['scope'] ?? 'read';
 		$code_challenge = $params['code_challenge'] ?? '';
 		$state = $params['state'] ?? '';
+		$resource = $params['resource'] ?? '';
 
-		// Generate authorization code
-		$auth_code = $this->generateAuthorizationCode( $client_id, $user_id, $code_challenge, $scope );
+		// Generate authorization code with resource parameter
+		$auth_code = $this->generateAuthorizationCode( $client_id, $user_id, $code_challenge, $scope, $resource );
 
 		// Store user authorization
 		$this->storeUserAuthorization( $user_id, $client_id );

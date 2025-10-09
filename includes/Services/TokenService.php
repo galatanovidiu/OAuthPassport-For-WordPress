@@ -161,19 +161,24 @@ class TokenService {
 		$new_access_token = $this->token_generator->generateAccessToken();
 		$new_refresh_token = $this->token_generator->generateRefreshToken();
 
-		// Store new tokens
+		// Preserve resource binding from refresh token (RFC 8707)
+		$resource = $token_data->resource ?? '';
+
+		// Store new tokens with preserved resource binding
 		$access_success = $this->token_repository->storeAccessToken(
 			$new_access_token,
 			$token_data->client_id,
 			(int) $token_data->user_id,
-			$token_data->scope ?? 'read write'
+			$token_data->scope ?? 'read write',
+			$resource
 		);
 
 		$refresh_success = $this->token_repository->storeRefreshToken(
 			$new_refresh_token,
 			$token_data->client_id,
 			(int) $token_data->user_id,
-			$token_data->scope ?? 'read write'
+			$token_data->scope ?? 'read write',
+			$resource
 		);
 
 		if ( ! $access_success || ! $refresh_success ) {
@@ -183,13 +188,20 @@ class TokenService {
 		// Delete old refresh token (token rotation)
 		$this->token_repository->deleteTokenById( (int) $token_data->id );
 
-		return array(
+		$response = array(
 			'access_token'  => $new_access_token,
 			'refresh_token' => $new_refresh_token,
 			'token_type'    => 'Bearer',
 			'expires_in'    => 3600,
 			'scope'         => $token_data->scope ?? 'read write',
 		);
+
+		// Include resource in response if present (RFC 8707)
+		if ( ! empty( $resource ) ) {
+			$response['resource'] = $resource;
+		}
+
+		return $response;
 	}
 
 	/**

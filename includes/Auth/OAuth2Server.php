@@ -255,6 +255,11 @@ class OAuth2Server {
 					'state'                 => array(
 						'type' => 'string',
 					),
+					'resource'              => array(
+						'type'              => 'string',
+						'format'            => 'uri',
+						'validate_callback' => array( $this, 'validate_resource_param' ),
+					),
 				),
 			)
 		);
@@ -492,7 +497,9 @@ class OAuth2Server {
 		$redirect_uri   = $request->get_param( 'redirect_uri' );
 		$code_challenge = $request->get_param( 'code_challenge' );
 		$state          = $request->get_param( 'state' );
-		$scope          = $request->get_param( 'scope' ) ?? implode( ' ', ScopeManager::get_default_scopes() );
+		$resource       = $request->get_param( 'resource' ) ?? '';
+		$default_scope  = implode( ' ', $this->scope_manager->getDefaultScopes() );
+		$scope          = $request->get_param( 'scope' ) ?? $default_scope;
 
 
 		// Validate required parameters.
