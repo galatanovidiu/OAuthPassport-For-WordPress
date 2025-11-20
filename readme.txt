@@ -8,15 +8,27 @@ Stable tag: 0.0.1
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
+⚠️ EXPERIMENTAL ALPHA - For testing only. NOT for production use.
+
 Transform your WordPress site into a secure OAuth 2.1 authorization server. Enable third-party applications to authenticate users and access your APIs.
 
 == Description ==
+
+**⚠️ IMPORTANT: This is an EXPERIMENTAL ALPHA release intended for testing and development only. DO NOT use in production environments. APIs and features may change significantly.**
 
 OAuth Passport transforms your WordPress site into a **secure OAuth 2.1 authorization server**. It enables external applications to authenticate users and access your WordPress resources through standards-compliant OAuth flows.
 
 **MCP Compliant**: Fully compliant with the [Model Context Protocol (MCP) Authorization specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization), making it the ideal authorization server for MCP implementations.
 
 Perfect for developers building MCP servers, mobile apps, desktop applications, or integrating with third-party services.
+
+= Alpha Release Limitations =
+
+* Limited production testing
+* APIs may change between versions
+* Breaking changes possible
+* Use for development/testing only
+* No upgrade path guaranteed
 
 = Key Features =
 
@@ -72,9 +84,12 @@ OAuth Passport is fully compliant with the [Model Context Protocol (MCP) Authori
 
 == Installation ==
 
+**Note: This is an alpha release. Install only in development/testing environments.**
+
 1. Upload the plugin files to `/wp-content/plugins/oauth-passport/` or install through WordPress admin
 2. Activate the plugin through the 'Plugins' screen
 3. Navigate to **Settings > OAuth Passport** to configure
+4. If rewrite rules don't work, go to Settings > Permalinks and click Save
 4. Register your first OAuth client to get started
 
 = Manual Installation =
@@ -147,7 +162,7 @@ Yes! Use the `oauth_passport_scopes` filter to add custom scopes:
 == Upgrade Notice ==
 
 = 0.0.1 =
-Initial alpha release of OAuth Passport. Transform your WordPress site into a secure OAuth 2.1 authorization server.
+⚠️ EXPERIMENTAL ALPHA RELEASE - For testing and development only. DO NOT use in production. Initial alpha release of OAuth Passport. Transform your WordPress site into a secure OAuth 2.1 authorization server.
 
 == Technical Requirements ==
 

@@ -3,8 +3,13 @@
 [![WordPress Plugin Version](https://img.shields.io/badge/WordPress-6.4%2B-blue.svg)](https://wordpress.org/)
 [![PHP Version](https://img.shields.io/badge/PHP-8.0%2B-purple.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Alpha%20%28Experimental%29-orange.svg)](https://github.com/galatanovidiu/oauth-passport/releases)
 
 Transform your WordPress site into a secure OAuth 2.1 authorization server.
+
+> **⚠️ EXPERIMENTAL ALPHA RELEASE**  
+> This plugin is in active development and intended for **testing and development only**.  
+> **DO NOT use in production environments.** APIs and features may change significantly between versions.
 
 ## What is OAuth Passport?
 

@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*' # Triggers on version tags like v1.0.0, v1.2.3, etc.
 
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
@@ -52,44 +55,51 @@ jobs:
         echo "..."
         echo "Total files: $(unzip -l oauth-passport.zip | tail -1)"
 
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Create Release and Upload Asset
+      uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ steps.get_version.outputs.tag_name }}
-        release_name: OAuth Passport ${{ steps.get_version.outputs.version }}
+        name: OAuth Passport ${{ steps.get_version.outputs.version }}
         draft: false
-        prerelease: false
+        prerelease: true
+        files: oauth-passport.zip
         body: |
-          ## OAuth Passport ${{ steps.get_version.outputs.version }}
+          # OAuth Passport ${{ steps.get_version.outputs.version }}
           
-          WordPress OAuth 2.1 authorization server plugin.
+          ⚠️ **EXPERIMENTAL ALPHA RELEASE** - For testing and development only. DO NOT use in production.
           
-          ### Installation
-          1. Download the `oauth-passport.zip` file below
-          2. Upload to your WordPress site via Plugins > Add New > Upload Plugin
-          3. Activate the plugin
-          4. Configure at Settings > OAuth Passport
+          ## What's New
           
-          ### Requirements
+          MCP-compliant OAuth 2.1 authorization server for WordPress.
+          
+          - ✅ Model Context Protocol (MCP) Authorization compliant
+          - ✅ OAuth 2.1 with mandatory PKCE
+          - ✅ Dynamic Client Registration (RFC 7591)
+          - ✅ Authorization Server Metadata (RFC 8414)
+          - ✅ Protected Resource Metadata (RFC 9728)
+          - ✅ Resource Indicators (RFC 8707)
+          - ✅ React Admin Interface
+          
+          ## Installation
+          
+          1. Download `oauth-passport.zip` below
+          2. Upload to WordPress via Plugins > Add New > Upload Plugin
+          3. Activate and configure at Settings > OAuth Passport
+          
+          ## Requirements
+          
           - WordPress 6.4+
           - PHP 8.0+
-          - HTTPS (production)
+          - HTTPS (required in production)
+          - Pretty permalinks enabled
           
-          ### Documentation
-          See the [docs/](https://github.com/${{ github.repository }}/tree/main/docs) folder for complete documentation.
-
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./oauth-passport.zip
-        asset_name: oauth-passport.zip
-        asset_content_type: application/zip
+          ## Documentation
+          
+          - [Release Notes](https://github.com/${{ github.repository }}/blob/${{ steps.get_version.outputs.tag_name }}/RELEASE_NOTES.md)
+          - [Installation Guide](https://github.com/${{ github.repository }}/blob/${{ steps.get_version.outputs.tag_name }}/README.md)
+          
+          ---
+          
+          **Remember: This is an alpha release for testing only!**
 
     - name: Upload to WordPress.org (optional)
       if: false # Disabled by default - enable when ready for WordPress.org
