@@ -14,12 +14,17 @@ Transform your WordPress site into a secure OAuth 2.1 authorization server. Enab
 
 OAuth Passport transforms your WordPress site into a **secure OAuth 2.1 authorization server**. It enables external applications to authenticate users and access your WordPress resources through standards-compliant OAuth flows.
 
-Perfect for developers building mobile apps, desktop applications, or integrating with third-party services.
+**MCP Compliant**: Fully compliant with the [Model Context Protocol (MCP) Authorization specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization), making it the ideal authorization server for MCP implementations.
+
+Perfect for developers building MCP servers, mobile apps, desktop applications, or integrating with third-party services.
 
 = Key Features =
 
+* **MCP Authorization Compliant** - Fully compliant with Model Context Protocol requirements
 * **OAuth 2.1 Compliant** - Full implementation with mandatory PKCE support
 * **Dynamic Client Registration** - Self-service client registration (RFC 7591)
+* **Protected Resource Metadata** - RFC 9728 support for authorization server discovery
+* **Resource Indicators** - RFC 8707 support for token audience binding
 * **React Admin Interface** - Modern admin panel for managing clients and tokens
 * **Discovery Endpoints** - Automatic configuration discovery for easy integration
 * **WordPress Integration** - Seamless integration with WordPress user system
@@ -27,6 +32,7 @@ Perfect for developers building mobile apps, desktop applications, or integratin
 
 = Use Cases =
 
+* **MCP Servers** - Authorization server for Model Context Protocol implementations
 * **Mobile Apps** - Authenticate users in iOS/Android applications
 * **Desktop Applications** - Secure authentication for desktop software
 * **Third-party Integrations** - Allow external services to access your APIs
@@ -53,11 +59,16 @@ OAuth Passport provides helper functions for easy integration:
 
 = Standards Compliance =
 
-* RFC 6749 (OAuth 2.0)
-* RFC 7636 (PKCE)
-* RFC 7591 (Dynamic Client Registration)
-* RFC 8414 (Authorization Server Metadata)
-* OAuth 2.1 Draft Specification
+OAuth Passport is fully compliant with the [Model Context Protocol (MCP) Authorization specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization) and implements:
+
+* Model Context Protocol Authorization Requirements
+* OAuth 2.1 specification (draft-ietf-oauth-v2-1-13)
+* RFC 7591 - Dynamic Client Registration Protocol
+* RFC 7636 - Proof Key for Code Exchange (PKCE - Mandatory)
+* RFC 8414 - Authorization Server Metadata
+* RFC 9728 - Protected Resource Metadata
+* RFC 8707 - Resource Indicators for OAuth 2.0
+* RFC 6750 - Bearer Token Usage
 
 == Installation ==
 
@@ -117,13 +128,16 @@ Yes! Use the `oauth_passport_scopes` filter to add custom scopes:
 
 = 0.0.1 =
 * Initial alpha release
+* Model Context Protocol (MCP) Authorization compliant
 * OAuth 2.1 compliant authorization server
 * Dynamic Client Registration (RFC 7591)
+* Protected Resource Metadata (RFC 9728)
 * Authorization Server Metadata discovery (RFC 8414)
+* Resource Indicators support (RFC 8707)
 * JWKS endpoint for token validation
 * PKCE mandatory support for all flows
 * Authorization Code flow with refresh tokens
-* Token rotation for enhanced security
+* Token rotation and audience validation
 * React-based admin interface
 * Comprehensive security features
 * WordPress integration with user system

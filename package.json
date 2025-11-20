@@ -1,10 +1,13 @@
 {
 	"name": "oauth-passport",
 	"version": "0.0.1",
-	"description": "A WordPress plugin for OAuth 2.0 authentication and authorization. Provides secure OAuth client and server functionality for WordPress applications, enabling third-party authentication and API access control.",
+	"description": "MCP-compliant OAuth 2.1 authorization server for WordPress. Provides secure OAuth functionality for WordPress applications, enabling third-party authentication and API access control with full Model Context Protocol support.",
 	"keywords": [
 		"wordpress",
+		"mcp",
+		"model-context-protocol",
 		"oauth",
+		"oauth2.1",
 		"authentication",
 		"authorization",
 		"security"

@@ -1,6 +1,6 @@
 {
 	"name": "oauthpassport/oauth-passport",
-	"description": "OAuth 2.1 authentication server for WordPress",
+	"description": "MCP-compliant OAuth 2.1 authorization server for WordPress",
 	"type": "wordpress-plugin",
 	"license": "GPL-2.0-or-later",
 	"minimum-stability": "stable",
@@ -64,6 +64,8 @@
 	"keywords": [
 		"wordpress",
 		"plugin",
+		"mcp",
+		"model-context-protocol",
 		"oauth",
 		"oauth2",
 		"oauth2.1",
