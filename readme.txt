@@ -4,7 +4,7 @@ Tags: oauth, oauth2, authentication, api, rest-api, security, authorization, tok
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.0
-Stable tag: 1.0.0
+Stable tag: 0.0.1
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -115,8 +115,8 @@ Yes! Use the `oauth_passport_scopes` filter to add custom scopes:
 
 == Changelog ==
 
-= 1.0.0 =
-* Initial release
+= 0.0.1 =
+* Initial alpha release
 * OAuth 2.1 compliant authorization server
 * Dynamic Client Registration (RFC 7591)
 * Authorization Server Metadata discovery (RFC 8414)
@@ -132,8 +132,8 @@ Yes! Use the `oauth_passport_scopes` filter to add custom scopes:
 
 == Upgrade Notice ==
 
-= 1.0.0 =
-Initial release of OAuth Passport. Transform your WordPress site into a secure OAuth 2.1 authorization server.
+= 0.0.1 =
+Initial alpha release of OAuth Passport. Transform your WordPress site into a secure OAuth 2.1 authorization server.
 
 == Technical Requirements ==
 
@@ -170,8 +170,8 @@ The plugin does not collect any personal data beyond what is necessary for OAuth
 
 == Support ==
 
-* **Documentation**: See [docs/](https://github.com/your-repo/tree/main/docs) folder for comprehensive guides
-* **GitHub**: Report issues and contribute on GitHub
+* **Documentation**: See [docs/](https://github.com/galatanovidiu/oauth-passport/tree/main/docs) folder for comprehensive guides
+* **GitHub**: Report issues and contribute on [GitHub](https://github.com/galatanovidiu/oauth-passport/issues)
 
 == Credits ==
 

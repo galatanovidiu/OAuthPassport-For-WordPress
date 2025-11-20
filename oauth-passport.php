@@ -2,7 +2,7 @@
 /**
  * Plugin name:       OAuth Passport
  * Description:       Transform your WordPress site into a secure OAuth 2.1 authorization server. Enable third-party applications to authenticate users and access your APIs through standards-compliant OAuth flows.
- * Version:           0.1.0
+ * Version:           0.0.1
  * Requires at least: 6.4
  * Requires PHP:      8.0
  * Author:            Ovidiu Galatan
@@ -33,7 +33,7 @@ use OAuthPassport\Services\AuthorizationService;
 use OAuthPassport\Services\ClientService;
 use OAuthPassport\Services\TokenService;
 
-define( 'OAUTH_PASSPORT_VERSION', '0.1.0' );
+define( 'OAUTH_PASSPORT_VERSION', '0.0.1' );
 define( 'OAUTH_PASSPORT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'OAUTH_PASSPORT_URL', plugin_dir_url( __FILE__ ) );
 

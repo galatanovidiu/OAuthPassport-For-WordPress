@@ -1,6 +1,6 @@
 {
 	"name": "oauth-passport",
-	"version": "0.2.3",
+	"version": "0.0.1",
 	"description": "A WordPress plugin for OAuth 2.0 authentication and authorization. Provides secure OAuth client and server functionality for WordPress applications, enabling third-party authentication and API access control.",
 	"keywords": [
 		"wordpress",
